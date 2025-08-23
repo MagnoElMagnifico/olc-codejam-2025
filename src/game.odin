@@ -53,6 +53,7 @@ Game_State :: struct {
 
 	ui: UI_State,
 	camera: Camera,
+	window_size: iv2
 }
 
 Camera :: struct {
@@ -107,18 +108,26 @@ set_text_to_number :: proc(buf: []u8, n: uint) {
 // ==== GAME INIT =============================================================
 
 init :: proc() {
-	game_state.run = true
-	game_state.camera.zoom = 1.0
-	game_state.ui.n_sides = 3
-	set_text_to_number(game_state.ui.sides_text[:], game_state.ui.n_sides)
+	using game_state
+
+	run = true
+	camera.zoom = 1.0
+	ui.n_sides = 3
+	window_size = WINDOW_SIZE
+	set_text_to_number(ui.sides_text[:], ui.n_sides)
 
 	rl.SetConfigFlags({.WINDOW_RESIZABLE, .VSYNC_HINT})
-	rl.InitWindow(WINDOW_SIZE.x, WINDOW_SIZE.y, WINDOW_NAME)
+	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
 }
 
 // ==== GAME UPDATE ===========================================================
 
 update :: proc() {
+	// Llamar también en desktop para actualizar el valor del game_state
+	when ODIN_OS != .JS {
+		parent_window_size_changed(rl.GetScreenWidth(), rl.GetScreenHeight())
+	}
+
 	// ==== GAME INPUT HANDLING ===============================================
 	// Máquina de estados
 	switch game_state.state {
@@ -305,22 +314,27 @@ update :: proc() {
 	{
 		rl.DrawText(
 			fmt.caprintf("time: %1.5f\x00", rl.GetFrameTime(), context.temp_allocator),
-			0, WINDOW_SIZE.y - 50, 12, rl.WHITE)
+			0, game_state.window_size.y - 50, 12, rl.WHITE)
 		rl.DrawText(
 			fmt.caprintf("zoom: %1.5f\x00", game_state.camera.zoom, context.temp_allocator),
-			0, WINDOW_SIZE.y - 35, 12, rl.WHITE)
+			0, game_state.window_size.y - 35, 12, rl.WHITE)
 		rl.DrawText(
 			fmt.caprintf("n figures: %d\x00", len(game_state.figures), context.temp_allocator),
-			0, WINDOW_SIZE.y - 20, 12, rl.WHITE)
+			0, game_state.window_size.y - 20, 12, rl.WHITE)
+		log.info(game_state.window_size)
 	}
 
 	free_all(context.temp_allocator)
 }
 
-// In a web build, this is called when browser changes size. Remove the
-// `rl.SetWindowSize` call if you don't want a resizable game.
-parent_window_size_changed :: proc(w, h: int) {
-	rl.SetWindowSize(c.int(w), c.int(h))
+// In a web build, this is called when browser changes size. Remove
+// the `rl.SetWindowSize` call if you don't want a resizable game.
+parent_window_size_changed :: proc(w, h: c.int) {
+	game_state.window_size = {w, h}
+	when ODIN_OS == .JS {
+		// No ejecutar en desktop porque lo leemos desde la propia ventana
+		rl.SetWindowSize(w, h)
+	}
 }
 
 shutdown :: proc() {
