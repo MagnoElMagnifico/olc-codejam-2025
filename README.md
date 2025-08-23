@@ -20,8 +20,7 @@ Run the specific files for your platform:
 - [Odin Overview](https://odin-lang.org/docs/overview/)
 - [Odin Demo](https://github.com/odin-lang/Odin/blob/master/examples/demo/demo.odin)
 - [Raylib Examples](https://www.raylib.com/examples.html)
-
-
+- [Raylib Cheatsheet](https://www.raylib.com/cheatsheet/cheatsheet.html)
 
 [OLC CodeJam 2025]: https://itch.io/jam/olc-codejam-2025
 [Odin Programming Language]: https://odin-lang.org/
