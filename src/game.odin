@@ -91,6 +91,7 @@ update :: proc() {
 			log.info(sides_text)
 		}
 	}
+	
 
 	if is_selected_text_Box_N_Side {
 
