@@ -19,6 +19,7 @@ Run the specific files for your platform:
 
 - [Odin Overview](https://odin-lang.org/docs/overview/)
 - [Odin Demo](https://github.com/odin-lang/Odin/blob/master/examples/demo/demo.odin)
+- [Odin Package Reference](https://pkg.odin-lang.org/)
 - [Raylib Examples](https://www.raylib.com/examples.html)
 - [Raylib Cheatsheet](https://www.raylib.com/cheatsheet/cheatsheet.html)
 
