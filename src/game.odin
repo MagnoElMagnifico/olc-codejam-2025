@@ -33,8 +33,10 @@ UI_PANEL_DIM :: rect {
 	UI_MARGIN,
 	UI_MARGIN,
 	/* text: */ 100 + /* 2 botones: */ 2*UI_LINE_HEIGHT + 3*UI_PADDING,
-	UI_LINE_HEIGHT
+	2 * UI_LINE_HEIGHT
 }
+
+CAMERA_ZOOM_SPEED :: 1.0
 
 // ==== GAME DATA =============================================================
 
@@ -47,6 +49,14 @@ Game_State :: struct {
 	current_figure: Regular_Figure,
 
 	ui: UI_State,
+	camera: Camera,
+}
+
+Camera :: struct {
+	zoom: f32,
+	position: v2,
+	start_pos: v2,
+	offset: v2,
 }
 
 UI_State :: struct {
@@ -89,6 +99,7 @@ set_text_to_number :: proc(buf: []u8, n: uint) {
 
 init :: proc() {
 	game_state.run = true
+	game_state.camera.zoom = 1.0
 	game_state.ui.n_sides = 3
 	set_text_to_number(game_state.ui.sides_text[:], game_state.ui.n_sides)
 
@@ -100,20 +111,16 @@ init :: proc() {
 
 update :: proc() {
 	// ==== GAME INPUT HANDLING ===============================================
-	// BUG: esto es bastante poco fiable
-	if rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_PANEL_DIM) {
-		log.error("colision")
-	}
-
 	// Máquina de estados
 	switch game_state.state {
 		case .View: {
 			using game_state
 
-			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+			if !rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_PANEL_DIM) && rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
 				log.info("Creación de una figura")
 
-				current_figure.center = rl.GetMousePosition()
+				// BUG: esto funciona bien?
+				current_figure.center = (rl.GetMousePosition() + camera.position) * camera.zoom
 				current_figure.n = game_state.ui.n_sides
 
 				// Evita que la figura haga flash si solo se hace un click
@@ -121,6 +128,23 @@ update :: proc() {
 
 				state = .New_Figure
 			}
+
+			// ==== Camera movement ====
+			if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
+				camera.start_pos = rl.GetMousePosition()
+			}
+
+			if rl.IsMouseButtonDown(rl.MouseButton.MIDDLE) {
+				camera.offset = (rl.GetMousePosition() - camera.start_pos) / camera.zoom
+			}
+
+			if rl.IsMouseButtonReleased(rl.MouseButton.MIDDLE) {
+				camera.position += camera.offset
+				camera.offset = {}
+			}
+
+			// ==== Camera zoom ====
+			camera.zoom = linalg.clamp(camera.zoom + rl.GetMouseWheelMove() * CAMERA_ZOOM_SPEED, 0.25, 3.0)
 
 			// TODO: transición a .Selected_Figure
 		}
@@ -131,7 +155,8 @@ update :: proc() {
 			if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
 				// TODO: para que sean números enteros, aquí hay que hacer
 				// cálculos para que coincida bien
-				radius = rl.GetMousePosition()
+				// BUG:
+				radius = (rl.GetMousePosition() + game_state.camera.position) * game_state.camera.zoom
 			} \
 
 			// Si la figura es muy pequeña, salir
@@ -171,9 +196,9 @@ update :: proc() {
 		// interpolar, lo que puede causar que no vayan bien sincronizados.
 		// Problema para luego.
 		rl.DrawPolyLines(
-			center,
+			(center + game_state.camera.position + game_state.camera.offset) * game_state.camera.zoom,
 			sides = c.int(n),
-			radius = linalg.vector_length(diff),
+			radius = linalg.vector_length(diff) * game_state.camera.zoom,
 			rotation = rotation,
 			color = rl.RED
 		)
@@ -189,9 +214,9 @@ update :: proc() {
 		// interpolar, lo que puede causar que no vayan bien sincronizados.
 		// Problema para luego.
 		rl.DrawPolyLines(
-			f.center,
+			(f.center + game_state.camera.position + game_state.camera.offset) * game_state.camera.zoom,
 			sides = c.int(f.n),
-			radius = linalg.vector_length(diff),
+			radius = linalg.vector_length(diff) * game_state.camera.zoom,
 			rotation = rotation,
 			color = rl.WHITE
 		)
@@ -199,15 +224,16 @@ update :: proc() {
 
 	// Render UI: debe ejecutarse después de las figuras para que se muestre por
 	// encima.
-	// @ui
+	// TODO: customizar estilos, se ve bastante como la caca
 	{
 		using game_state.ui
 
 		// Para la UI de más adelante
 		current_x : f32 = UI_PADDING + UI_MARGIN // posicion inicial
 
-		// TODO: customizar estilos, se ve bastante como la caca
-		rl.GuiPanel(UI_PANEL_DIM, "Figure Options")
+		panel := UI_PANEL_DIM
+		panel.height /= 2
+		rl.GuiPanel(panel, "Figure Options")
 
 		rl.GuiLabel({current_x, UI_Y_POS, 30, UI_LINE_HEIGHT}, "Sides:")
 		rl.GuiLabel({current_x + 50, UI_Y_POS, 5, UI_LINE_HEIGHT},
@@ -228,6 +254,19 @@ update :: proc() {
 			set_text_to_number(sides_text[:], n_sides)
 		}
 		current_x += UI_LINE_HEIGHT + UI_PADDING
+	}
+
+	// Debug info
+	{
+		rl.DrawText(
+			fmt.caprintf("time: %1.5f\x00", rl.GetFrameTime(), context.temp_allocator),
+			0, WINDOW_SIZE.y - 50, 12, rl.WHITE)
+		rl.DrawText(
+			fmt.caprintf("zoom: %1.5f\x00", game_state.camera.zoom, context.temp_allocator),
+			0, WINDOW_SIZE.y - 35, 12, rl.WHITE)
+		rl.DrawText(
+			fmt.caprintf("n figures: %d\x00", len(game_state.figures), context.temp_allocator),
+			0, WINDOW_SIZE.y - 20, 12, rl.WHITE)
 	}
 
 	free_all(context.temp_allocator)
