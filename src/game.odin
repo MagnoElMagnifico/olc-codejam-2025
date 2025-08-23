@@ -145,9 +145,23 @@ update :: proc() {
 	// Render figure
 	{
 		using game_state.figure
-		c := v2_to_iv2(center)
-		r := linalg.vector_length(center - radius)
-		rl.DrawCircleLines(c.x, c.y, radius = r, color = rl.WHITE)
+		diff := center - radius
+		rotation := linalg.atan(diff.y / diff.x) * linalg.DEG_PER_RAD
+
+		// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
+		if diff.x > 0 do rotation += 180
+
+		// TODO: si usamos esto, no tenemos una lista de puntos luego que
+		// interpolar, lo que puede causar que no vayan bien sincronizados.
+		// Problema para luego.
+		rl.DrawPolyLines(
+			center,
+			sides = 4,
+			radius = linalg.vector_length(diff),
+			rotation = rotation,
+			color = rl.WHITE
+		)
+
 	}
 
 	// Anything allocated using temp allocator is invalid after this.
