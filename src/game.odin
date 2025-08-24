@@ -37,7 +37,9 @@ UI_PANEL_DIM :: rect {
 	2 * UI_LINE_HEIGHT
 }
 
-CAMERA_ZOOM_SPEED :: 1.0
+CAMERA_ZOOM_SPEED :: 0.25
+CAMERA_ZOOM_MIN :: 0.25
+CAMERA_ZOOM_MAX :: 3.0
 
 // ==== GAME DATA =============================================================
 
@@ -120,8 +122,7 @@ update :: proc() {
 			if !rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_PANEL_DIM) && rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
 				log.info("Creación de una figura")
 
-				// BUG: esto funciona bien?
-				current_figure.center = (rl.GetMousePosition() + camera.position) * camera.zoom
+				current_figure.center = rl.GetMousePosition() / camera.zoom - camera.position
 				current_figure.n = game_state.ui.n_sides
 
 				// Evita que la figura haga flash si solo se hace un click
@@ -145,7 +146,11 @@ update :: proc() {
 			}
 
 			// ==== Camera zoom ====
-			camera.zoom = linalg.clamp(camera.zoom + rl.GetMouseWheelMove() * CAMERA_ZOOM_SPEED, 0.25, 3.0)
+			mouse_wheel := rl.GetMouseWheelMove()
+			if mouse_wheel != 0 {
+				mouse_pos := rl.GetMousePosition()
+				camera.zoom = linalg.clamp(camera.zoom + mouse_wheel * CAMERA_ZOOM_SPEED, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX)
+			}
 
 			// TODO: transición a .Selected_Figure
 		}
@@ -156,11 +161,7 @@ update :: proc() {
 			if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
 				// TODO: para que sean números enteros, aquí hay que hacer
 				// cálculos para que coincida bien
-				// BUG:
-				radius = (rl.GetMousePosition() + game_state.camera.position) * game_state.camera.zoom
-
-
-
+				radius = (rl.GetMousePosition() / game_state.camera.zoom - game_state.camera.position)
 			} \
 
 			// Si la figura es muy pequeña, salir
