@@ -24,10 +24,13 @@ WINDOW_SIZE :: iv2 {1280, 720}
 
 MIN_FIG_RADIUS :: 3.0
 
-UI_PADDING     : f32 : 3
-UI_LINE_HEIGHT : f32 : 30
-UI_MARGIN      :     : 10
-UI_Y_POS       :     : 20 + UI_MARGIN
+UI_PADDING     :: 3
+UI_LINE_HEIGHT :: 30
+UI_MARGIN      :: 10
+UI_Y_POS       :: 20 + UI_MARGIN
+
+FIGURE_SELECTOR_SIZE :: 10
+FIGURE_MIN_RADIUS_SELECTOR :: 20
 
 // Tamaño del panel UI
 UI_PANEL_DIM :: rect {
@@ -48,9 +51,12 @@ Game_State :: struct {
 	run: bool, // Determina si seguir ejecutando el game loop
 	simulation_running: bool, // Determina si mover los puntos de las figuras
 
-	state: State,
 	figures: [dynamic]Regular_Figure,
-	current_figure: Regular_Figure,
+
+	// Determinar qué hacen las acciones del ratón
+	state: State,
+	// nil: nada seleccionado
+	current_figure: ^Regular_Figure,
 
 	ui: UI_State,
 	camera: Camera,
@@ -69,8 +75,9 @@ Camera :: struct {
 }
 
 UI_State :: struct {
+	// Se usa para determinar el número de lados de nuevas figuras
 	n_sides: uint,
-	// solo hacen falta dos dígitos + null terminator
+	// Solo hacen falta dos dígitos + null terminator
 	sides_text: [3]u8,
 }
 
@@ -78,6 +85,7 @@ State :: enum {
 	View = 0,
 	New_Figure,
 	Selected_Figure,
+	Move_Figure,
 }
 
 Vertice :: struct {
@@ -145,15 +153,15 @@ to_world :: proc(camera: Camera, v: v2) -> v2 {
 update_camera :: proc() {
 	using game_state.camera
 	// ==== Camera movement ====
-	if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
+	if rl.IsMouseButtonPressed(.MIDDLE) {
 		start_pos = rl.GetMousePosition()
 	}
 
-	if rl.IsMouseButtonDown(rl.MouseButton.MIDDLE) {
+	if rl.IsMouseButtonDown(.MIDDLE) {
 		offset = (start_pos - rl.GetMousePosition()) / zoom
 	}
 
-	if rl.IsMouseButtonReleased(rl.MouseButton.MIDDLE) {
+	if rl.IsMouseButtonReleased(.MIDDLE) {
 		position += offset
 		offset = {}
 	}
@@ -174,13 +182,20 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 
 	// Transformar coordenadas del mundo a coordenadas en la pantalla
 	using game_state
+	screen_center := to_screen(camera, fig.center)
+	screen_radius := linalg.vector_length(diff) * camera.zoom
+
 	rl.DrawPolyLines(
-		center = to_screen(camera, fig.center),
+		center = screen_center,
 		sides = c.int(fig.n),
-		radius = linalg.vector_length(diff) * camera.zoom,
+		radius = screen_radius,
 		rotation = rotation,
 		color = color,
 	)
+
+	if screen_radius > FIGURE_MIN_RADIUS_SELECTOR {
+		rl.DrawCircleLines(c.int(screen_center.x), c.int(screen_center.y), FIGURE_SELECTOR_SIZE, color)
+	}
 
 	// Dibujar los vértices
 	// El siguiente es equivalente, pero menos código: for i := 0; i < int(n); i += 1
@@ -195,15 +210,17 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 	//
 	// Sin embargo, no sé si en el resultado final tendremos que dibujar los
 	// vértices.
-	for i in 0 ..< fig.n {
-		angle := math.to_radians(360 * f32(i) / f32(fig.n))
+	when false {
+		for i in 0 ..< fig.n {
+			angle := math.to_radians(360 * f32(i) / f32(fig.n))
 
-		circle_center: v2
-		circle_center.x = fig.center.x - (diff.x * math.cos(angle) - diff.y * math.sin(angle))
-		circle_center.y = fig.center.y - (diff.x * math.sin(angle) + diff.y * math.cos(angle))
-		circle_center = to_screen(camera, circle_center)
+			circle_center: v2
+			circle_center.x = fig.center.x - (diff.x * math.cos(angle) - diff.y * math.sin(angle))
+			circle_center.y = fig.center.y - (diff.x * math.sin(angle) + diff.y * math.cos(angle))
+			circle_center = to_screen(camera, circle_center)
 
-		rl.DrawCircleLines(c.int(circle_center.x), c.int(circle_center.y), 5.0, color)
+			rl.DrawCircleLines(c.int(circle_center.x), c.int(circle_center.y), 5.0, color)
+		}
 	}
 
 	// Dibujar el punto
@@ -228,7 +245,7 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 	beat_point := point1 + fig.point_progress * line_vector
 	beat_point = to_screen(camera, beat_point)
 
-	rl.DrawCircleLines(c.int(beat_point.x), c.int(beat_point.y), 5.0, rl.SKYBLUE)
+	rl.DrawCircle(c.int(beat_point.x), c.int(beat_point.y), 5.0, rl.SKYBLUE)
 }
 
 update_regular_figure :: proc(fig: ^Regular_Figure) {
@@ -241,6 +258,124 @@ update_regular_figure :: proc(fig: ^Regular_Figure) {
 		// cambiar de segmento
 		fig.point_progress = 0.0
 		fig.point_seg_index = (fig.point_seg_index + 1) % (fig.n)
+	}
+}
+
+update_mouse_input :: proc() {
+	// Ignorar eventos mientras se está en la UI
+	if rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_PANEL_DIM) {
+		return
+	}
+
+	using game_state
+	switch state {
+	case .View: {
+		assert(current_figure == nil, "En modo .View, current_figure debe ser nil")
+
+		if rl.IsMouseButtonPressed(.LEFT) {
+			// Comprobar si se seleccionan figuras
+			mouse_world := to_world(camera, rl.GetMousePosition())
+			for &fig in figures {
+				// Esta comprobación es rápida, por eso usamos círculos
+				if rl.CheckCollisionPointCircle(mouse_world, fig.center, FIGURE_SELECTOR_SIZE) {
+					current_figure = &fig
+					break
+				}
+			}
+			
+			if current_figure != nil {
+				// Seleccionar figura
+				log.info("Figura seleccionada")
+				state = .Selected_Figure
+
+				// Actualizar UI con su numero de lados
+				ui.n_sides = current_figure.n
+				set_text_to_number(ui.sides_text[:], ui.n_sides)
+
+			} else {
+				// Crear nueva figura
+				log.info("Creación de una figura")
+				state = .New_Figure
+
+				center := to_world(game_state.camera, rl.GetMousePosition())
+				append(&figures, Regular_Figure {
+					center = center,
+					radius = center,
+					n = ui.n_sides,
+				})
+
+				current_figure = &figures[len(figures)-1]
+			}
+		}
+	}
+
+	case .New_Figure: {
+		assert(current_figure != nil, "Modo .New_Figure require una figura seleccionada")
+
+		if rl.IsMouseButtonDown(.LEFT) {
+			// TODO: para que sean números enteros, aquí hay que hacer
+			// cálculos para que coincida bien
+			current_figure.radius = to_world(camera, rl.GetMousePosition())
+		} else if linalg.vector_length(current_figure.center - current_figure.radius) < MIN_FIG_RADIUS {
+			// Si la figura es muy pequeña, salir
+			current_figure = nil
+			state = .View
+			pop(&figures)
+		} else {
+			// De lo contrario, añadir a la lista
+			log.info("Figura creada en", current_figure.center)
+			state = .Selected_Figure
+		}
+	}
+
+	case .Selected_Figure: {
+		assert(current_figure != nil, "Modo .Selected_Figure require una figura seleccionada")
+
+		if rl.IsKeyPressed(.ESCAPE) {
+			current_figure = nil
+			state = .View
+		}
+
+		if rl.IsMouseButtonPressed(.LEFT) {
+			mouse_world := to_world(camera, rl.GetMousePosition())
+			new_selected_figure: ^Regular_Figure
+			for &fig in figures {
+				// Esta comprobación es rápida, por eso usamos círculos
+				if rl.CheckCollisionPointCircle(mouse_world, fig.center, FIGURE_SELECTOR_SIZE) {
+					new_selected_figure = &fig
+				}
+			}
+
+			if new_selected_figure == nil {
+				// Deseleccionar si se hace click en otro lado
+				current_figure = nil
+				state = .View
+			} else if new_selected_figure == current_figure {
+				// Arrastrar la figura
+				state = .Move_Figure
+			} else {
+				// Seleccionar otra figura
+				current_figure = new_selected_figure
+
+				ui.n_sides = current_figure.n
+				set_text_to_number(ui.sides_text[:], ui.n_sides)
+			}
+		}
+
+		// TODO: cambiar tamaño / lado / perímetro
+	}
+
+	case .Move_Figure: {
+		assert(current_figure != nil, "Modo .Move_Figure require una figura seleccionada")
+
+		if rl.IsMouseButtonDown(.LEFT) {
+			diff := current_figure.center - current_figure.radius
+			current_figure.center = to_world(camera, rl.GetMousePosition())
+			current_figure.radius = current_figure.center - diff
+		} else {
+			state = .Selected_Figure
+		}
+	}
 	}
 }
 
@@ -258,6 +393,9 @@ init :: proc() {
 
 	rl.SetConfigFlags({.WINDOW_RESIZABLE, .MSAA_4X_HINT, .VSYNC_HINT})
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
+
+	// No cerrar en escape
+	rl.SetExitKey(.KEY_NULL)
 }
 
 // ==== GAME UPDATE ===========================================================
@@ -269,57 +407,11 @@ update :: proc() {
 	}
 
 	// ==== GAME INPUT HANDLING ===============================================
-	// Máquina de estados
-	switch game_state.state {
-		case .View: {
-			update_camera()
+	update_camera()
+	update_mouse_input()
 
-			using game_state
-
-			if !rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_PANEL_DIM) && rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
-				log.info("Creación de una figura")
-
-				current_figure.center = to_world(game_state.camera, rl.GetMousePosition())
-				current_figure.n = game_state.ui.n_sides
-
-				// Evita que la figura haga flash si solo se hace un click
-				current_figure.radius = current_figure.center
-
-				state = .New_Figure
-			}
-
-			if rl.IsKeyPressed(.SPACE) {
-				simulation_running = !simulation_running
-			}
-
-			// TODO: transición a .Selected_Figure
-		}
-
-		case .New_Figure: {
-			using game_state.current_figure
-
-			if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
-				// TODO: para que sean números enteros, aquí hay que hacer
-				// cálculos para que coincida bien
-				radius = to_world(game_state.camera, rl.GetMousePosition())
-			} \
-
-			// Si la figura es muy pequeña, salir
-			else if linalg.vector_length(center - radius) < MIN_FIG_RADIUS {
-				game_state.state = .View
-			} \
-
-			// De lo contrario, añadir a la lista
-			else {
-				append(&game_state.figures, game_state.current_figure)
-				log.info("Figura creada en", game_state.current_figure.center)
-				game_state.state = .View
-			}
-		}
-
-		case .Selected_Figure: {
-			// TODO:
-		}
+	if rl.IsKeyPressed(.SPACE) {
+		game_state.simulation_running = !game_state.simulation_running
 	}
 
 	// ==== RENDER ============================================================
@@ -328,11 +420,6 @@ update :: proc() {
 
 	rl.ClearBackground({30, 30, 30, 255})
 
-	// Render figure
-	if game_state.state == .New_Figure {
-		render_regular_figure(game_state.current_figure, rl.RED)
-	}
-
 	for &f in game_state.figures {
 		// PERF: quizá mover el if a su propio bucle, pero el branch predictor
 		// lo detectará bien porque es constante
@@ -340,6 +427,12 @@ update :: proc() {
 			update_regular_figure(&f)
 		}
 		render_regular_figure(f, rl.WHITE)
+	}
+
+	// Render figure
+	if game_state.state == .New_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
+		// TODO: se dibujará 2 veces la figura seleccionada
+		render_regular_figure(game_state.current_figure^, rl.RED)
 	}
 
 	// Render UI: debe ejecutarse después de las figuras para que se muestre por
@@ -365,6 +458,10 @@ update :: proc() {
 		if rl.GuiButton({current_x, UI_Y_POS+5, UI_LINE_HEIGHT-10, UI_LINE_HEIGHT-10}, "+") {
 			n_sides = min(n_sides + 1, 25)
 			set_text_to_number(sides_text[:], n_sides)
+
+			if game_state.state == .Selected_Figure {
+				game_state.current_figure.n = n_sides
+			}
 		}
 		current_x += UI_LINE_HEIGHT + UI_PADDING
 
@@ -372,12 +469,19 @@ update :: proc() {
 			// TODO: permitir líneas? Habría un salto de 2 a 1 (no hay figuras de 2 lados
 			n_sides = max(n_sides - 1, 3)
 			set_text_to_number(sides_text[:], n_sides)
+
+			if game_state.state == .Selected_Figure {
+				game_state.current_figure.n = n_sides
+			}
 		}
 		current_x += UI_LINE_HEIGHT + UI_PADDING
 	}
 
 	// Debug info
 	{
+		rl.DrawText(
+			fmt.caprintf("state: %w\x00", game_state.state, context.temp_allocator),
+			0, game_state.window_size.y - 80, 12, rl.WHITE)
 		rl.DrawText(
 			fmt.caprintf("simulation: %w\x00", game_state.simulation_running, context.temp_allocator),
 			0, game_state.window_size.y - 65, 12, rl.WHITE)
