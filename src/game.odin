@@ -74,11 +74,17 @@ State :: enum {
 	Selected_Figure,
 }
 
+Vertice :: struct {
+	center: v2,
+	radius: int,
+}
+
 // Figuras regulares: todos sus lados son iguales
 Regular_Figure :: struct {
 	center: v2,
 	radius: v2,
 	n: uint,
+	vertices: [dynamic]Vertice
 }
 
 // Convertir el numero actual a cstring para mostrarlo en la UI
@@ -239,14 +245,22 @@ update :: proc() {
 			rotation = rotation,
 			color = rl.WHITE
 		)
+
 		//(centerX, centerY: c.int, radius: f32, color: Color)
 		for i:=0; i < int(f.n); i+=1{
+			x:=cast(i32) (f.center.x-(diff.x*math.cos_f32(math.to_radians(360*f32(i)/f32(f.n)))-math.sin_f32(math.to_radians(360*f32(i)/f32(f.n)))*diff.y))
+			y:=cast(i32) (f.center.y-(diff.x*math.sin_f32(math.to_radians(360*f32(i)/f32(f.n)))+math.cos_f32(math.to_radians(360*f32(i)/f32(f.n)))*diff.y))
 			rl.DrawCircleLines(
-				cast(i32) (f.center.x-(diff.x*math.cos_f32(math.to_radians(360*f32(i)/f32(f.n)))-math.sin_f32(math.to_radians(360*f32(i)/f32(f.n)))*diff.y)),
-				cast(i32) (f.center.y-(diff.x*math.sin_f32(math.to_radians(360*f32(i)/f32(f.n)))+math.cos_f32(math.to_radians(360*f32(i)/f32(f.n)))*diff.y)),
+				x,
+				y,
 				5.0,
 				color = rl.WHITE
-			)
+			) //de momento solo es un dibujo
+			v:=  Vertice{
+				center = v2{cast(f32)x, cast(f32)y},
+				radius = 5
+			}
+			//append(&f.vertices, v) //FIXME: por qué sale ese error, no lo entiendo
 		}
 
 		
