@@ -236,10 +236,10 @@ update_regular_figure :: proc(fig: ^Regular_Figure) {
 	fig.point_progress += rl.GetFrameTime()
 
 	if fig.point_progress > 1.0 {
-		fig.point_progress = 0.0
-		fig.point_seg_index = (fig.point_seg_index + 1) % (fig.n)
 		// TODO: el sonido se reproduce aquí, porque sabemos que acaba de
 		// cambiar de segmento
+		fig.point_progress = 0.0
+		fig.point_seg_index = (fig.point_seg_index + 1) % (fig.n)
 	}
 }
 
@@ -254,7 +254,7 @@ init :: proc() {
 	window_size = WINDOW_SIZE
 	set_text_to_number(ui.sides_text[:], ui.n_sides)
 
-	rl.SetConfigFlags({.WINDOW_RESIZABLE, .VSYNC_HINT})
+	rl.SetConfigFlags({.WINDOW_RESIZABLE, .MSAA_4X_HINT, .VSYNC_HINT})
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
 }
 
