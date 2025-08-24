@@ -46,6 +46,7 @@ CAMERA_ZOOM_MAX :: 3.0
 game_state: Game_State
 Game_State :: struct {
 	run: bool, // Determina si seguir ejecutando el game loop
+	simulation_running: bool, // Determina si mover los puntos de las figuras
 
 	state: State,
 	figures: [dynamic]Regular_Figure,
@@ -249,6 +250,7 @@ init :: proc() {
 	using game_state
 
 	run = true
+	simulation_running = true
 	camera.zoom = 1.0
 	ui.n_sides = 3
 	window_size = WINDOW_SIZE
@@ -284,6 +286,10 @@ update :: proc() {
 				current_figure.radius = current_figure.center
 
 				state = .New_Figure
+			}
+
+			if rl.IsKeyPressed(.SPACE) {
+				simulation_running = !simulation_running
 			}
 
 			// TODO: transición a .Selected_Figure
@@ -328,7 +334,11 @@ update :: proc() {
 	}
 
 	for &f in game_state.figures {
-		update_regular_figure(&f)
+		// PERF: quizá mover el if a su propio bucle, pero el branch predictor
+		// lo detectará bien porque es constante
+		if game_state.simulation_running {
+			update_regular_figure(&f)
+		}
 		render_regular_figure(f, rl.WHITE)
 	}
 
@@ -368,6 +378,9 @@ update :: proc() {
 
 	// Debug info
 	{
+		rl.DrawText(
+			fmt.caprintf("simulation: %w\x00", game_state.simulation_running, context.temp_allocator),
+			0, game_state.window_size.y - 65, 12, rl.WHITE)
 		rl.DrawText(
 			fmt.caprintf("time: %1.5f\x00", rl.GetFrameTime(), context.temp_allocator),
 			0, game_state.window_size.y - 50, 12, rl.WHITE)
