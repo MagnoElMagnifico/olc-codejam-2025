@@ -59,6 +59,10 @@ Game_State :: struct {
 Camera :: struct {
 	zoom: f32,
 	position: v2,
+
+	// Para mover la cámara, se almacena la posición antes de moverse y luego se
+	// actualiza el offset.
+	// Estas coordenadas están en screen space.
 	start_pos: v2,
 	offset: v2,
 }
@@ -85,7 +89,11 @@ Regular_Figure :: struct {
 	center: v2,
 	radius: v2,
 	n: uint,
-	vertices: [dynamic]Vertice
+
+	// Indica en qué segmento está el punto: [0, n-1]
+	point_seg_index: uint,
+	// Indica el progreso dentro del segmento actual
+	point_progress: f32,
 }
 
 // Convertir el numero actual a cstring para mostrarlo en la UI
@@ -103,6 +111,136 @@ set_text_to_number :: proc(buf: []u8, n: uint) {
 	buf[0] = u8(n/10 + uint('0'))
 	buf[1] = u8(n%10 + uint('0'))
 	buf[2] = 0
+}
+
+// Convierte un vector con coordenadas del mundo a coordenadas de pantalla
+// Usar siempre antes de dibujar algo en la pantalla para que la camara funcione
+// correctamente.
+to_screen :: proc(camera: Camera, v: v2) -> v2 {
+	// El centro del zoom será el centro de la pantalla
+	focus := v2 { f32(game_state.window_size.x) / 2, f32(game_state.window_size.y) / 2 }
+
+	// https://rexthony.medium.com/how-panning-and-zooming-work-in-a-2d-top-down-game-ab00c9d05d1a
+	pan := v - camera.position - camera.offset
+	zoom := camera.zoom * pan - focus * (camera.zoom - 1)
+
+	return zoom
+}
+
+// Convierte un vector con coordenadas la pantalla (posición del ratón) a
+// coordenadas de mundo
+to_world :: proc(camera: Camera, v: v2) -> v2 {
+	focus := v2 { f32(game_state.window_size.x) / 2, f32(game_state.window_size.y) / 2 }
+	// v = z * pan - focus * (z - 1)
+	// v / z = pan - focus * (z - 1) / z
+	// pan = v / z + focus * (z - 1) / z
+	// pan = (v + focus * (z - 1)) / z
+
+	undo_zoom := (v + focus * (camera.zoom - 1)) / camera.zoom
+	undo_pan := undo_zoom + camera.position + camera.offset
+	return undo_pan
+}
+
+update_camera :: proc() {
+	using game_state.camera
+	// ==== Camera movement ====
+	if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
+		start_pos = rl.GetMousePosition()
+	}
+
+	if rl.IsMouseButtonDown(rl.MouseButton.MIDDLE) {
+		offset = (start_pos - rl.GetMousePosition()) / zoom
+	}
+
+	if rl.IsMouseButtonReleased(rl.MouseButton.MIDDLE) {
+		position += offset
+		offset = {}
+	}
+
+	// ==== Camera zoom ====
+	mouse_wheel := rl.GetMouseWheelMove()
+	if mouse_wheel != 0 {
+		zoom = linalg.clamp(zoom + mouse_wheel * CAMERA_ZOOM_SPEED, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX)
+	}
+}
+
+render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
+	diff := fig.center - fig.radius
+	rotation := linalg.atan(diff.y / diff.x) * linalg.DEG_PER_RAD
+
+	// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
+	if diff.x > 0 do rotation += 180
+
+	// Transformar coordenadas del mundo a coordenadas en la pantalla
+	using game_state
+	rl.DrawPolyLines(
+		center = to_screen(camera, fig.center),
+		sides = c.int(fig.n),
+		radius = linalg.vector_length(diff) * camera.zoom,
+		rotation = rotation,
+		color = color,
+	)
+
+	// Dibujar los vértices
+	// El siguiente es equivalente, pero menos código: for i := 0; i < int(n); i += 1
+	//
+	// TODO: probablemente se pueda calcular de otra forma más eficiente, pero
+	// por ahora así nos sirve.
+	//
+	// Todas las figuras regulares tienen los mismos ángulos, lo que implica que
+	// podemos calcular así solo 2 puntos, tomar su vector y sumarlo N-1 veces
+	// para encontrar el resto de puntos. Así es más rápido porque para los dos
+	// primeros calculas varios (sen, cos), pero para el resto son solo sumas.
+	//
+	// Sin embargo, no sé si en el resultado final tendremos que dibujar los
+	// vértices.
+	for i in 0 ..< fig.n {
+		angle := math.to_radians(360 * f32(i) / f32(fig.n))
+
+		circle_center: v2
+		circle_center.x = fig.center.x - (diff.x * math.cos(angle) - diff.y * math.sin(angle))
+		circle_center.y = fig.center.y - (diff.x * math.sin(angle) + diff.y * math.cos(angle))
+		circle_center = to_screen(camera, circle_center)
+
+		rl.DrawCircleLines(c.int(circle_center.x), c.int(circle_center.y), 5.0, color)
+	}
+
+	// Dibujar el punto
+	// Calcular puntos del segmento actual: igual que en el bucle
+	angle1 := math.to_radians(360 * f32(fig.point_seg_index)     / f32(fig.n))
+	angle2 := math.to_radians(360 * f32(fig.point_seg_index + 1) / f32(fig.n))
+
+	point1: v2
+	point1.x = fig.center.x - (diff.x * math.cos(angle1) - diff.y * math.sin(angle1))
+	point1.y = fig.center.y - (diff.x * math.sin(angle1) + diff.y * math.cos(angle1))
+
+	point2: v2
+	point2.x = fig.center.x - (diff.x * math.cos(angle2) - diff.y * math.sin(angle2))
+	point2.y = fig.center.y - (diff.x * math.sin(angle2) + diff.y * math.cos(angle2))
+
+	// Ahora interpolar entre las dos posiciones
+	// Ecuación vectorial de una recta: (x, y) = p1 + k * v
+	// TODO: este método de interpolación provoca que todos los segmentos duren
+	// lo mismo. Puede que sea lo que queramos, y así evitamos tener que el
+	// usuario tenga que medir de forma precisa el perímetro o los lados
+	line_vector := point2 - point1
+	beat_point := point1 + fig.point_progress * line_vector
+	beat_point = to_screen(camera, beat_point)
+
+	rl.DrawCircleLines(c.int(beat_point.x), c.int(beat_point.y), 5.0, rl.SKYBLUE)
+}
+
+update_regular_figure :: proc(fig: ^Regular_Figure) {
+	// TODO: hacer bien el deltatime, ya que esta aplicación requiere de un
+	// ritmo bastante preciso: https://youtu.be/yGhfUcPjXuE
+	fig.point_progress += rl.GetFrameTime()
+
+	if fig.point_progress > 1.0 {
+		fig.point_progress = 0.0
+		fig.point_seg_index = (fig.point_seg_index + 1) % (fig.n)
+		// TODO: el sonido se reproduce aquí, porque sabemos que acaba de
+		// cambiar de segmento
+	}
 }
 
 // ==== GAME INIT =============================================================
@@ -132,39 +270,20 @@ update :: proc() {
 	// Máquina de estados
 	switch game_state.state {
 		case .View: {
+			update_camera()
+
 			using game_state
 
 			if !rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_PANEL_DIM) && rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
 				log.info("Creación de una figura")
 
-				current_figure.center = rl.GetMousePosition() / camera.zoom - camera.position
+				current_figure.center = to_world(game_state.camera, rl.GetMousePosition())
 				current_figure.n = game_state.ui.n_sides
 
 				// Evita que la figura haga flash si solo se hace un click
 				current_figure.radius = current_figure.center
 
 				state = .New_Figure
-			}
-
-			// ==== Camera movement ====
-			if rl.IsMouseButtonPressed(rl.MouseButton.MIDDLE) {
-				camera.start_pos = rl.GetMousePosition()
-			}
-
-			if rl.IsMouseButtonDown(rl.MouseButton.MIDDLE) {
-				camera.offset = (rl.GetMousePosition() - camera.start_pos) / camera.zoom
-			}
-
-			if rl.IsMouseButtonReleased(rl.MouseButton.MIDDLE) {
-				camera.position += camera.offset
-				camera.offset = {}
-			}
-
-			// ==== Camera zoom ====
-			mouse_wheel := rl.GetMouseWheelMove()
-			if mouse_wheel != 0 {
-				mouse_pos := rl.GetMousePosition()
-				camera.zoom = linalg.clamp(camera.zoom + mouse_wheel * CAMERA_ZOOM_SPEED, CAMERA_ZOOM_MIN, CAMERA_ZOOM_MAX)
 			}
 
 			// TODO: transición a .Selected_Figure
@@ -176,7 +295,7 @@ update :: proc() {
 			if rl.IsMouseButtonDown(rl.MouseButton.LEFT) {
 				// TODO: para que sean números enteros, aquí hay que hacer
 				// cálculos para que coincida bien
-				radius = (rl.GetMousePosition() / game_state.camera.zoom - game_state.camera.position)
+				radius = to_world(game_state.camera, rl.GetMousePosition())
 			} \
 
 			// Si la figura es muy pequeña, salir
@@ -188,7 +307,6 @@ update :: proc() {
 			else {
 				append(&game_state.figures, game_state.current_figure)
 				log.info("Figura creada en", game_state.current_figure.center)
-				log.info(radius)
 				game_state.state = .View
 			}
 		}
@@ -206,74 +324,12 @@ update :: proc() {
 
 	// Render figure
 	if game_state.state == .New_Figure {
-		using game_state.current_figure
-		diff := center - radius
-		rotation := linalg.atan(diff.y / diff.x) * linalg.DEG_PER_RAD
-
-		// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
-		if diff.x > 0 do rotation += 180
-		
-		log.info(rotation)
-
-		// TODO: si usamos esto, no tenemos una lista de puntos luego que
-		// interpolar, lo que puede causar que no vayan bien sincronizados.
-		// Problema para luego.
-		rl.DrawPolyLines(
-			(center + game_state.camera.position + game_state.camera.offset) * game_state.camera.zoom,
-			sides = c.int(n),
-			radius = linalg.vector_length(diff) * game_state.camera.zoom,
-			rotation = rotation,
-			color = rl.RED
-		)
-
-		for i:=0; i < int(n); i+=1{
-			rl.DrawCircleLines(
-				cast(i32) (center.x-(diff.x*math.cos_f32(math.to_radians(360*f32(i)/f32(n)))-math.sin_f32(math.to_radians(360*f32(i)/f32(n)))*diff.y)),
-				cast(i32) (center.y-(diff.x*math.sin_f32(math.to_radians(360*f32(i)/f32(n)))+math.cos_f32(math.to_radians(360*f32(i)/f32(n)))*diff.y)),
-				5.0,
-				color = rl.RED
-			)
-		}
-
-			
+		render_regular_figure(game_state.current_figure, rl.RED)
 	}
-	for f in game_state.figures {
-		diff := f.center - f.radius
-		rotation := linalg.atan(diff.y / diff.x) * linalg.DEG_PER_RAD
 
-		// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
-		if diff.x > 0 do rotation += 180
-
-		// TODO: si usamos esto, no tenemos una lista de puntos luego que
-		// interpolar, lo que puede causar que no vayan bien sincronizados.
-		// Problema para luego.
-		rl.DrawPolyLines(
-			(f.center + game_state.camera.position + game_state.camera.offset) * game_state.camera.zoom,
-			sides = c.int(f.n),
-			radius = linalg.vector_length(diff) * game_state.camera.zoom,
-			rotation = rotation,
-			color = rl.WHITE
-		)
-
-		//(centerX, centerY: c.int, radius: f32, color: Color)
-		for i:=0; i < int(f.n); i+=1{
-			x:=cast(i32) (f.center.x-(diff.x*math.cos_f32(math.to_radians(360*f32(i)/f32(f.n)))-math.sin_f32(math.to_radians(360*f32(i)/f32(f.n)))*diff.y))
-			y:=cast(i32) (f.center.y-(diff.x*math.sin_f32(math.to_radians(360*f32(i)/f32(f.n)))+math.cos_f32(math.to_radians(360*f32(i)/f32(f.n)))*diff.y))
-			rl.DrawCircleLines(
-				x,
-				y,
-				5.0,
-				color = rl.WHITE
-			) //de momento solo es un dibujo
-			v:=  Vertice{
-				center = v2{cast(f32)x, cast(f32)y},
-				radius = 5
-			}
-			//append(&f.vertices, v) //FIXME: por qué sale ese error, no lo entiendo
-		}
-
-		
-
+	for &f in game_state.figures {
+		update_regular_figure(&f)
+		render_regular_figure(f, rl.WHITE)
 	}
 
 	// Render UI: debe ejecutarse después de las figuras para que se muestre por
@@ -321,7 +377,6 @@ update :: proc() {
 		rl.DrawText(
 			fmt.caprintf("n figures: %d\x00", len(game_state.figures), context.temp_allocator),
 			0, game_state.window_size.y - 20, 12, rl.WHITE)
-		log.info(game_state.window_size)
 	}
 
 	free_all(context.temp_allocator)
