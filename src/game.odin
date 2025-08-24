@@ -10,6 +10,7 @@ import "core:fmt"
 import "core:c"
 import "core:strconv"
 import "core:strings"
+import "core:math"
 
 // ==== CONSTANTS =============================================================
 
@@ -157,6 +158,9 @@ update :: proc() {
 				// cálculos para que coincida bien
 				// BUG:
 				radius = (rl.GetMousePosition() + game_state.camera.position) * game_state.camera.zoom
+
+
+
 			} \
 
 			// Si la figura es muy pequeña, salir
@@ -168,6 +172,7 @@ update :: proc() {
 			else {
 				append(&game_state.figures, game_state.current_figure)
 				log.info("Figura creada en", game_state.current_figure.center)
+				log.info(radius)
 				game_state.state = .View
 			}
 		}
@@ -191,6 +196,8 @@ update :: proc() {
 
 		// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
 		if diff.x > 0 do rotation += 180
+		
+		log.info(rotation)
 
 		// TODO: si usamos esto, no tenemos una lista de puntos luego que
 		// interpolar, lo que puede causar que no vayan bien sincronizados.
@@ -202,6 +209,17 @@ update :: proc() {
 			rotation = rotation,
 			color = rl.RED
 		)
+
+		for i:=0; i < int(n); i+=1{
+			rl.DrawCircleLines(
+				cast(i32) (center.x-(diff.x*math.cos_f32(math.to_radians(360*f32(i)/f32(n)))-math.sin_f32(math.to_radians(360*f32(i)/f32(n)))*diff.y)),
+				cast(i32) (center.y-(diff.x*math.sin_f32(math.to_radians(360*f32(i)/f32(n)))+math.cos_f32(math.to_radians(360*f32(i)/f32(n)))*diff.y)),
+				5.0,
+				color = rl.RED
+			)
+		}
+
+			
 	}
 	for f in game_state.figures {
 		diff := f.center - f.radius
@@ -220,6 +238,18 @@ update :: proc() {
 			rotation = rotation,
 			color = rl.WHITE
 		)
+		//(centerX, centerY: c.int, radius: f32, color: Color)
+		for i:=0; i < int(f.n); i+=1{
+			rl.DrawCircleLines(
+				cast(i32) (f.center.x-(diff.x*math.cos_f32(math.to_radians(360*f32(i)/f32(f.n)))-math.sin_f32(math.to_radians(360*f32(i)/f32(f.n)))*diff.y)),
+				cast(i32) (f.center.y-(diff.x*math.sin_f32(math.to_radians(360*f32(i)/f32(f.n)))+math.cos_f32(math.to_radians(360*f32(i)/f32(f.n)))*diff.y)),
+				5.0,
+				color = rl.WHITE
+			)
+		}
+
+		
+
 	}
 
 	// Render UI: debe ejecutarse después de las figuras para que se muestre por
