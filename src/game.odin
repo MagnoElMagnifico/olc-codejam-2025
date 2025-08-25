@@ -6,7 +6,6 @@ import rl "vendor:raylib"
 
 import "core:math/linalg"
 import "core:log"
-import "core:fmt"
 import "core:c"
 import "core:strconv"
 import "core:strings"
@@ -24,21 +23,8 @@ WINDOW_SIZE :: iv2 {1280, 720}
 
 MIN_FIG_RADIUS :: 3.0
 
-UI_PADDING     :: 3
-UI_LINE_HEIGHT :: 30
-UI_MARGIN      :: 10
-UI_Y_POS       :: 20 + UI_MARGIN
-
 FIGURE_SELECTOR_SIZE :: 10
 FIGURE_MIN_RADIUS_SELECTOR :: 20
-
-// Tamaño del panel UI
-UI_PANEL_DIM :: rect {
-	UI_MARGIN,
-	UI_MARGIN,
-	/* text: */ 100 + /* 2 botones: */ 2*UI_LINE_HEIGHT + 3*UI_PADDING,
-	2 * UI_LINE_HEIGHT
-}
 
 CAMERA_ZOOM_SPEED :: 0.25
 CAMERA_ZOOM_MIN :: 0.25
@@ -74,23 +60,11 @@ Camera :: struct {
 	offset: v2,
 }
 
-UI_State :: struct {
-	// Se usa para determinar el número de lados de nuevas figuras
-	n_sides: uint,
-	// Solo hacen falta dos dígitos + null terminator
-	sides_text: [3]u8,
-}
-
 State :: enum {
 	View = 0,
 	New_Figure,
 	Selected_Figure,
 	Move_Figure,
-}
-
-Vertice :: struct {
-	center: v2,
-	radius: int,
 }
 
 // Figuras regulares: todos sus lados son iguales
@@ -103,24 +77,12 @@ Regular_Figure :: struct {
 	point_seg_index: uint,
 	// Indica el progreso dentro del segmento actual
 	point_progress: f32,
+	// Indica el número de ciclos que le queda a la figura
+	// TODO: cómo representamos infinito?
+	// point_counter: uint,
 }
 
-// Convertir el numero actual a cstring para mostrarlo en la UI
-set_text_to_number :: proc(buf: []u8, n: uint) {
-	assert(len(buf) <= 3, "set_text only implemented for 2 digits")
-
-	// Conversión de 1 dígito
-	if n < 10 {
-		buf[0] = u8(n + uint('0'))
-		buf[1] = 0
-		return
-	}
-
-	// Conversión de 2 dígitos
-	buf[0] = u8(n/10 + uint('0'))
-	buf[1] = u8(n%10 + uint('0'))
-	buf[2] = 0
-}
+// ==== CAMERA STUFF ==========================================================
 
 // Convierte un vector con coordenadas del mundo a coordenadas de pantalla
 // Usar siempre antes de dibujar algo en la pantalla para que la camara funcione
@@ -173,6 +135,8 @@ update_camera :: proc() {
 	}
 }
 
+// ==== FIGURES ===============================================================
+
 render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 	diff := fig.center - fig.radius
 	rotation := linalg.atan(diff.y / diff.x) * linalg.DEG_PER_RAD
@@ -224,31 +188,38 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 	}
 
 	// Dibujar el punto
-	// Calcular puntos del segmento actual: igual que en el bucle
-	angle1 := math.to_radians(360 * f32(fig.point_seg_index)     / f32(fig.n))
-	angle2 := math.to_radians(360 * f32(fig.point_seg_index + 1) / f32(fig.n))
+	/*if fig.point_counter > 0*/ {
+		// Calcular puntos del segmento actual: igual que en el bucle
+		angle1 := math.to_radians(360 * f32(fig.point_seg_index)     / f32(fig.n))
+		angle2 := math.to_radians(360 * f32(fig.point_seg_index + 1) / f32(fig.n))
 
-	point1: v2
-	point1.x = fig.center.x - (diff.x * math.cos(angle1) - diff.y * math.sin(angle1))
-	point1.y = fig.center.y - (diff.x * math.sin(angle1) + diff.y * math.cos(angle1))
+		point1: v2
+		point1.x = fig.center.x - (diff.x * math.cos(angle1) - diff.y * math.sin(angle1))
+		point1.y = fig.center.y - (diff.x * math.sin(angle1) + diff.y * math.cos(angle1))
 
-	point2: v2
-	point2.x = fig.center.x - (diff.x * math.cos(angle2) - diff.y * math.sin(angle2))
-	point2.y = fig.center.y - (diff.x * math.sin(angle2) + diff.y * math.cos(angle2))
+		point2: v2
+		point2.x = fig.center.x - (diff.x * math.cos(angle2) - diff.y * math.sin(angle2))
+		point2.y = fig.center.y - (diff.x * math.sin(angle2) + diff.y * math.cos(angle2))
 
-	// Ahora interpolar entre las dos posiciones
-	// Ecuación vectorial de una recta: (x, y) = p1 + k * v
-	// TODO: este método de interpolación provoca que todos los segmentos duren
-	// lo mismo. Puede que sea lo que queramos, y así evitamos tener que el
-	// usuario tenga que medir de forma precisa el perímetro o los lados
-	line_vector := point2 - point1
-	beat_point := point1 + fig.point_progress * line_vector
-	beat_point = to_screen(camera, beat_point)
+		// Ahora interpolar entre las dos posiciones
+		// Ecuación vectorial de una recta: (x, y) = p1 + k * v
+		// TODO: este método de interpolación provoca que todos los segmentos duren
+		// lo mismo. Puede que sea lo que queramos, y así evitamos tener que el
+		// usuario tenga que medir de forma precisa el perímetro o los lados
+		line_vector := point2 - point1
+		beat_point := point1 + fig.point_progress * line_vector
+		beat_point = to_screen(camera, beat_point)
 
-	rl.DrawCircle(c.int(beat_point.x), c.int(beat_point.y), 5.0, rl.SKYBLUE)
+		rl.DrawCircle(c.int(beat_point.x), c.int(beat_point.y), 5.0, rl.SKYBLUE)
+	}
 }
 
 update_regular_figure :: proc(fig: ^Regular_Figure) {
+	// No procesar figuras que no tienen contador
+	/*if fig.point_counter <= 0 {
+		return
+	}*/
+
 	// TODO: hacer bien el deltatime, ya que esta aplicación requiere de un
 	// ritmo bastante preciso: https://youtu.be/yGhfUcPjXuE
 	fig.point_progress += rl.GetFrameTime()
@@ -258,6 +229,7 @@ update_regular_figure :: proc(fig: ^Regular_Figure) {
 		// cambiar de segmento
 		fig.point_progress = 0.0
 		fig.point_seg_index = (fig.point_seg_index + 1) % (fig.n)
+		// fig.point_counter -= 1
 	}
 }
 
@@ -287,10 +259,6 @@ update_mouse_input :: proc() {
 				// Seleccionar figura
 				log.info("Figura seleccionada")
 				state = .Selected_Figure
-
-				// Actualizar UI con su numero de lados
-				ui.n_sides = current_figure.n
-				set_text_to_number(ui.sides_text[:], ui.n_sides)
 
 			} else {
 				// Crear nueva figura
@@ -356,9 +324,6 @@ update_mouse_input :: proc() {
 			} else {
 				// Seleccionar otra figura
 				current_figure = new_selected_figure
-
-				ui.n_sides = current_figure.n
-				set_text_to_number(ui.sides_text[:], ui.n_sides)
 			}
 		}
 
@@ -377,6 +342,14 @@ update_mouse_input :: proc() {
 		}
 	}
 	}
+
+	// Actualizar UI tras los cambios de estado
+	if state == .Selected_Figure {
+		// Actualizar UI con su numero de lados
+		ui.n_sides = current_figure.n
+		set_text_to_number(ui.sides_text[:], ui.n_sides)
+	}
+
 }
 
 // ==== GAME INIT =============================================================
@@ -406,7 +379,7 @@ update :: proc() {
 		parent_window_size_changed(rl.GetScreenWidth(), rl.GetScreenHeight())
 	}
 
-	// ==== GAME INPUT HANDLING ===============================================
+	// ==== Game input handling ===============================================
 	update_camera()
 	update_mouse_input()
 
@@ -414,12 +387,13 @@ update :: proc() {
 		game_state.simulation_running = !game_state.simulation_running
 	}
 
-	// ==== RENDER ============================================================
+	// ==== Render ============================================================
 	rl.BeginDrawing()
 	defer rl.EndDrawing()
 
 	rl.ClearBackground({30, 30, 30, 255})
 
+	// Render todas las figuras
 	for &f in game_state.figures {
 		// PERF: quizá mover el if a su propio bucle, pero el branch predictor
 		// lo detectará bien porque es constante
@@ -429,7 +403,7 @@ update :: proc() {
 		render_regular_figure(f, rl.WHITE)
 	}
 
-	// Render figure
+	// Render la figura seleccionada en un color distinto
 	if game_state.state == .New_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
 		// TODO: se dibujará 2 veces la figura seleccionada
 		render_regular_figure(game_state.current_figure^, rl.RED)
@@ -437,64 +411,7 @@ update :: proc() {
 
 	// Render UI: debe ejecutarse después de las figuras para que se muestre por
 	// encima.
-	// TODO: customizar estilos, se ve bastante como la caca
-	{
-		using game_state.ui
-
-		// Para la UI de más adelante
-		current_x : f32 = UI_PADDING + UI_MARGIN // posicion inicial
-
-		panel := UI_PANEL_DIM
-		panel.height /= 2
-		rl.GuiPanel(panel, "Figure Options")
-
-		rl.GuiLabel({current_x, UI_Y_POS, 30, UI_LINE_HEIGHT}, "Sides:")
-		rl.GuiLabel({current_x + 50, UI_Y_POS, 5, UI_LINE_HEIGHT},
-			cstring(raw_data(game_state.ui.sides_text[:])))
-
-		// añadir el width del elemento y padding para el siguiente
-		current_x += 100 + UI_PADDING
-
-		if rl.GuiButton({current_x, UI_Y_POS+5, UI_LINE_HEIGHT-10, UI_LINE_HEIGHT-10}, "+") {
-			n_sides = min(n_sides + 1, 25)
-			set_text_to_number(sides_text[:], n_sides)
-
-			if game_state.state == .Selected_Figure {
-				game_state.current_figure.n = n_sides
-			}
-		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
-
-		if rl.GuiButton({current_x, UI_Y_POS+5, UI_LINE_HEIGHT-10, UI_LINE_HEIGHT-10}, "-") {
-			// TODO: permitir líneas? Habría un salto de 2 a 1 (no hay figuras de 2 lados
-			n_sides = max(n_sides - 1, 3)
-			set_text_to_number(sides_text[:], n_sides)
-
-			if game_state.state == .Selected_Figure {
-				game_state.current_figure.n = n_sides
-			}
-		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
-	}
-
-	// Debug info
-	{
-		rl.DrawText(
-			fmt.caprintf("state: %w\x00", game_state.state, context.temp_allocator),
-			0, game_state.window_size.y - 80, 12, rl.WHITE)
-		rl.DrawText(
-			fmt.caprintf("simulation: %w\x00", game_state.simulation_running, context.temp_allocator),
-			0, game_state.window_size.y - 65, 12, rl.WHITE)
-		rl.DrawText(
-			fmt.caprintf("time: %1.5f\x00", rl.GetFrameTime(), context.temp_allocator),
-			0, game_state.window_size.y - 50, 12, rl.WHITE)
-		rl.DrawText(
-			fmt.caprintf("zoom: %1.5f\x00", game_state.camera.zoom, context.temp_allocator),
-			0, game_state.window_size.y - 35, 12, rl.WHITE)
-		rl.DrawText(
-			fmt.caprintf("n figures: %d\x00", len(game_state.figures), context.temp_allocator),
-			0, game_state.window_size.y - 20, 12, rl.WHITE)
-	}
+	render_ui()
 
 	free_all(context.temp_allocator)
 }
