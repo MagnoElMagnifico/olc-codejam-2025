@@ -6,6 +6,17 @@ import "core:c"
 import "core:log"
 import "core:math/linalg"
 
+FIGURE_SELECTOR_SIZE       :: 10
+FIGURE_MIN_RADIUS_SELECTOR :: 20
+FIGURE_MIN_RADIUS          :: 3.0
+
+Selection_State :: enum {
+	View = 0,
+	New_Figure,
+	Selected_Figure,
+	Move_Figure,
+}
+
 // Figuras regulares: todos sus lados son iguales
 Regular_Figure :: struct {
 	center: v2,
@@ -73,7 +84,7 @@ update_figure_input :: proc() {
 			// TODO: para que sean números enteros, aquí hay que hacer
 			// cálculos para que coincida bien
 			current_figure.radius = to_world(camera, rl.GetMousePosition())
-		} else if linalg.vector_length(current_figure.center - current_figure.radius) < MIN_FIG_RADIUS {
+		} else if linalg.vector_length(current_figure.center - current_figure.radius) < FIGURE_MIN_RADIUS {
 			// Si la figura es muy pequeña, salir
 			current_figure = nil
 			state = .View
