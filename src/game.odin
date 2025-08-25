@@ -28,6 +28,7 @@ Game_State :: struct {
 	state: Selection_State,
 	// nil: nada seleccionado
 	current_figure: ^Regular_Figure,
+	sync_points: bool,
 
 	ui: UI_State,
 	camera: Camera,
@@ -74,6 +75,13 @@ update :: proc() {
 	defer rl.EndDrawing()
 
 	rl.ClearBackground({30, 30, 30, 255})
+
+	if game_state.sync_points {
+		for &f in game_state.figures {
+			reset_figure_state(&f)
+		}
+		game_state.sync_points = false
+	}
 
 	// Render todas las figuras
 	for &f in game_state.figures {

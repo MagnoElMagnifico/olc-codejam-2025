@@ -6,7 +6,7 @@ import "core:c"
 
 UI_PADDING     :: 5
 UI_LINE_HEIGHT :: 30
-UI_MARGIN      :: 10
+UI_MARGIN      :: 15
 UI_Y_POS       :: UI_MARGIN + UI_LINE_HEIGHT
 UI_FONT_SIZE   :: 12
 
@@ -14,16 +14,16 @@ UI_FONT_SIZE   :: 12
 UI_PANEL_DIM :: rect {
 	UI_MARGIN,
 	UI_MARGIN,
-	/* text: */ 100 + /* 2 botones: */ 2*UI_LINE_HEIGHT + 3*UI_PADDING,
-	3 * UI_LINE_HEIGHT + UI_PADDING
+	/* text: */ 100 + /* 3 botones: */ 3*UI_LINE_HEIGHT + 3*UI_PADDING,
+	4 * UI_LINE_HEIGHT + UI_PADDING
 }
 
 // Tamaño del panel UI para dar a raylib
 UI_REAL_PANEL_DIM :: rect {
 	UI_MARGIN,
 	UI_MARGIN,
-	/* text: */ 100 + /* 2 botones: */ 2*UI_LINE_HEIGHT + 3*UI_PADDING,
-	3 * UI_LINE_HEIGHT + UI_PADDING
+	/* text: */ 100 + /* 3 botones: */ 3*UI_LINE_HEIGHT + 3*UI_PADDING,
+	4 * UI_LINE_HEIGHT + UI_PADDING
 }
 
 UI_State :: struct {
@@ -111,6 +111,18 @@ render_ui :: proc() {
 			// TODO:
 		}
 		current_x += UI_LINE_HEIGHT + UI_PADDING
+	}
+
+	current_x= UI_PADDING + UI_MARGIN
+	current_y += UI_LINE_HEIGHT
+
+	//Sincronizar puntos
+	{
+		rl.GuiLabel({current_x, current_y, 60, UI_LINE_HEIGHT}, "Sync points -> ")
+		current_x += 100 + UI_PADDING
+		if rl.GuiButton({current_x, current_y+UI_PADDING/2, 60, UI_LINE_HEIGHT-UI_PADDING}, "X") {
+			game_state.sync_points = true
+		}
 	}
 
 	// ==== Debug info ========================================================

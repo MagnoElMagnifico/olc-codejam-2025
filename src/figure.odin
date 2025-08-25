@@ -171,6 +171,12 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 	}
 }
 
+reset_figure_state :: proc(fig: ^Regular_Figure) {
+	fig.point_seg_index = 0
+	fig.point_progress = 0
+	// fig.point_counter = 0
+}
+
 
 render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 	diff := fig.center - fig.radius
