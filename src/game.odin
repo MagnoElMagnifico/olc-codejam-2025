@@ -49,6 +49,7 @@ init :: proc() {
 
 	rl.SetConfigFlags({.WINDOW_RESIZABLE, .MSAA_4X_HINT, .VSYNC_HINT})
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
+	rl.InitAudioDevice()
 
 	// No cerrar en escape
 	rl.SetExitKey(.KEY_NULL)
