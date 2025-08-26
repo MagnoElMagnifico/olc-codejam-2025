@@ -56,12 +56,6 @@ UI_Create_State :: struct {
 	counter: int,
 }
 
-// NOTE: No hace falta, porque se lee de la figura seleccionada actual
-/*UI_Figure_State :: struct{
-	n_sides: uint,
-	n_notes: [dynamic]uint,
-}*/
-
 // Convertir el numero actual a cstring para mostrarlo en la UI
 cstr_from_int :: proc(n: int, allocator := context.temp_allocator, loc := #caller_location) -> cstring {
 	// Si es negativo, denota infinito
@@ -98,11 +92,7 @@ render_create_figure_ui :: proc() {
 		current_x += UI_LINE_HEIGHT + UI_PADDING
 
 		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
-			// TODO: permitir líneas?
-			// Habría un salto de 2 a 1 (no hay figuras de 2 lados)
-			// No, sería el número de puntos, no de lados, pero aún así se
-			// necesitaría manejar el caso especial de líneas
-			n_sides = max(n_sides - 1, 3)
+			n_sides = max(n_sides - 1, 2)
 		}
 		current_x += UI_LINE_HEIGHT + UI_PADDING
 	}

@@ -55,7 +55,7 @@ delete_current_figure :: proc() {
 }
 
 
-// WARN: Solo poner código que relaciado con el ratón, no eventos de teclado
+// WARN: Solo poner código relacionado con el ratón, no eventos de teclado
 update_figure_mouse_input :: proc() {
 	using game_state
 
@@ -131,11 +131,6 @@ update_figure_mouse_input :: proc() {
 	case .Selected_Figure: {
 		assert(current_figure != nil, "Modo .Selected_Figure require una figura seleccionada")
 
-		if rl.IsKeyPressed(.ESCAPE) {
-			current_figure = nil
-			state = .View
-		}
-
 		if rl.IsMouseButtonPressed(.LEFT) {
 			mouse_world := to_world(camera, rl.GetMousePosition())
 			new_selected_figure: ^Regular_Figure
@@ -201,6 +196,8 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 }
 
 render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color := FIGURE_POINT_COLOR) {
+	using game_state
+
 	// Los parámetros son inmutables por defecto, pero con lo siguiente sí puedo
 	// modificarlos
 	color := color
@@ -218,23 +215,36 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color 
 	}
 
 	diff := fig.center - fig.radius
-	rotation := linalg.atan(diff.y / diff.x) * linalg.DEG_PER_RAD
-
-	// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
-	if diff.x >= 0 do rotation += 180
 
 	// Transformar coordenadas del mundo a coordenadas en la pantalla
-	using game_state
 	screen_center := to_screen(camera, fig.center)
 	screen_radius := linalg.vector_length(diff) * camera.zoom
 
-	rl.DrawPolyLines(
-		center = screen_center,
-		sides = c.int(fig.n),
-		radius = screen_radius,
-		rotation = rotation,
-		color = color,
-	)
+	if fig.n == 2 {
+		// TODO: dibujar hasta y desde el círculo central, pero no atravesarlo
+		point1 := to_screen(camera, fig.center + diff)
+		point2 := to_screen(camera, fig.center - diff)
+
+		rl.DrawLine(
+			c.int(point1.x), c.int(point1.y),
+			c.int(point2.x), c.int(point2.y),
+			color
+		)
+
+	} else {
+		rotation := linalg.atan(diff.y / diff.x) * linalg.DEG_PER_RAD
+
+		// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
+		if diff.x >= 0 do rotation += 180
+
+		rl.DrawPolyLines(
+			center = screen_center,
+			sides = c.int(fig.n),
+			radius = screen_radius,
+			rotation = rotation,
+			color = color,
+		)
+	}
 
 	if screen_radius > FIGURE_MIN_RADIUS_SELECTOR {
 		c_screen_center := iv2 {c.int(screen_center.x), c.int(screen_center.y)}
@@ -253,26 +263,26 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color 
 		)
 	}
 
-	// Dibujar los vértices
-	// El siguiente es equivalente, pero menos código: for i := 0; i < int(n); i += 1
-	//
-	// TODO: probablemente se pueda calcular de otra forma más eficiente, pero
-	// por ahora así nos sirve.
-	//
-	// Todas las figuras regulares tienen los mismos ángulos, lo que implica que
-	// podemos calcular así solo 2 puntos, tomar su vector y sumarlo N-1 veces
-	// para encontrar el resto de puntos. Así es más rápido porque para los dos
-	// primeros calculas varios (sen, cos), pero para el resto son solo sumas.
-	//
-	// Sin embargo, no sé si en el resultado final tendremos que dibujar los
-	// vértices.
-	when false {
+	when true {
+		// Dibujar los vértices
+		// El siguiente es equivalente, pero menos código: for i := 0; i < int(n); i += 1
+		//
+		// Probablemente se pueda calcular de otra forma más eficiente, pero por
+		// ahora así nos sirve.
+		//
+		// Todas las figuras regulares tienen los mismos ángulos, lo que implica que
+		// podemos calcular así solo 2 puntos, tomar su vector y sumarlo N-1 veces
+		// para encontrar el resto de puntos. Así es más rápido porque para los dos
+		// primeros calculas varios (sen, cos), pero para el resto son solo sumas.
+		//
+		// Sin embargo, no sé si en el resultado final tendremos que dibujar los
+		// vértices.
 		for i in 0 ..< fig.n {
-			angle := math.to_radians(360 * f32(i) / f32(fig.n))
+			angle := linalg.to_radians(360 * f32(i) / f32(fig.n))
 
 			circle_center: v2
-			circle_center.x = fig.center.x - (diff.x * math.cos(angle) - diff.y * math.sin(angle))
-			circle_center.y = fig.center.y - (diff.x * math.sin(angle) + diff.y * math.cos(angle))
+			circle_center.x = fig.center.x - (diff.x * linalg.cos(angle) - diff.y * linalg.sin(angle))
+			circle_center.y = fig.center.y - (diff.x * linalg.sin(angle) + diff.y * linalg.cos(angle))
 			circle_center = to_screen(camera, circle_center)
 
 			rl.DrawCircleLines(c.int(circle_center.x), c.int(circle_center.y), 5.0, color)
@@ -280,7 +290,6 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color 
 	}
 
 	// Dibujar el punto
-	// TODO: desactivar cuando no quede contador o seguir renderizando?
 	{
 		// Calcular puntos del segmento actual: igual que en el bucle
 		angle1 := linalg.to_radians(360 * f32(fig.point_seg_index)     / f32(fig.n))

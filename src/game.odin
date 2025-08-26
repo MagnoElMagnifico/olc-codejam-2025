@@ -61,7 +61,6 @@ init :: proc() {
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
 	rl.InitAudioDevice()
 
-	// TODO: La apertura del archivo falla. Pero teóricamente el path es correcto.
 	game_state.music_notes[.Do]  = rl.LoadSound("assets/sounds/Do.wav")
 	game_state.music_notes[.Re]  = rl.LoadSound("assets/sounds/Re.wav")
 	game_state.music_notes[.Mi]  = rl.LoadSound("assets/sounds/Mi.wav")
