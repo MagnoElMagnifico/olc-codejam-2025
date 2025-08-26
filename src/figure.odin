@@ -4,10 +4,9 @@ import rl "vendor:raylib"
 import m "core:math/linalg"
 
 import "core:c"
-import "core:log"
 import "core:mem"
 
-FIGURE_SELECTOR_SIZE       :: 10
+FIGURE_SELECTOR_SIZE       :: 20
 FIGURE_MIN_RADIUS_SELECTOR :: 20
 FIGURE_MIN_RADIUS          :: 3.0
 FIGURE_POINT_RADIUS        :: 5.0
@@ -87,12 +86,10 @@ update_figure_mouse_input :: proc() {
 			
 			if current_figure != nil {
 				// Seleccionar figura
-				log.info("Figura seleccionada")
 				state = .Selected_Figure
 
 			} else {
 				// Crear nueva figura
-				log.info("Creación de una figura")
 				state = .Edit_Figure
 
 				center := to_world(game_state.camera, rl.GetMousePosition())
@@ -127,7 +124,6 @@ update_figure_mouse_input :: proc() {
 			state = .View
 			pop(&figures)
 		} else {
-			log.info("Figura creada en", current_figure.center)
 			state = .Selected_Figure
 		}
 	}
@@ -139,10 +135,18 @@ update_figure_mouse_input :: proc() {
 			// Comprobar si seleccionamos algo
 			mouse_world := to_world(camera, rl.GetMousePosition())
 
-			// Comprobar si se hace click en el vértice para cambiar su tamaño
-			if rl.CheckCollisionPointCircle(mouse_world, current_figure.radius, FIGURE_POINT_RADIUS) {
-				log.info("Cambiar tamaño de figura")
+			if rl.CheckCollisionPointCircle(mouse_world, current_figure.center, FIGURE_SELECTOR_SIZE) {
+				// Arrastrar la figura
+				state = .Move_Figure
+
+			} else if rl.CheckCollisionPointCircle(mouse_world, current_figure.radius, FIGURE_POINT_RADIUS) {
+				// Click en el vértice para cambiar su tamaño
 				state = .Edit_Figure
+
+			} else if collision, segment, progress := check_collision_figure(mouse_world, current_figure^); collision {
+				// Cambiar la posición del punto actual
+				current_figure.point_seg_index = segment
+				current_figure.point_progress = progress
 
 			} else {
 				// Sino, mirar si se ha seleccionado otra figura
@@ -158,17 +162,13 @@ update_figure_mouse_input :: proc() {
 					// Deseleccionar si se hace click en otro lado
 					current_figure = nil
 					state = .View
-				} else if new_selected_figure == current_figure {
-					// Arrastrar la figura
-					state = .Move_Figure
 				} else {
+					assert(new_selected_figure != current_figure)
 					// Seleccionar otra figura
 					current_figure = new_selected_figure
 				}
 			}
 		}
-
-		// TODO: cambiar tamaño / lado / perímetro
 	}
 
 	case .Move_Figure: {
@@ -185,18 +185,37 @@ update_figure_mouse_input :: proc() {
 	}
 }
 
-
 update_figure_state :: proc(fig: ^Regular_Figure) {
 	// No procesar figuras que no tienen contador
 	if fig.point_counter == 0 {
 		return
 	}
 
+	//
+	//     rl.GetFrameTime()
+	//
+	// Con esto se hace que todos los lados tarden en recorrerse aproximadamente
+	// un segundo (poco a poco va atrasando).
+	//
+	//     rl.GetFrameTime() * f32(fig.n)
+	//
+	// Lo anterior hace que cada ciclo dure ~1 segundo, por lo que a más
+	// vértices, mayor es la frecuencia. Esto también podría ser útil. El
+	// problema es que atrasa más rápido.
+	//
+	// Funciones de Odin con precisión de nanosegundos:
+	//
+	//     import core:time
+	//     time.now() -> Time
+	//     time.since(Time) -> Duration
+	//
 	// TODO: este método de interpolación provoca que todos los segmentos duren
 	// lo mismo. Puede que sea lo que queramos, y así evitamos tener que el
 	// usuario tenga que medir de forma precisa el perímetro o los lados
 	// Posible alternativa, calcular la longitud del lado y:
 	//     "tamaño de lado" (px) / "tiempo de frame" (seg) = velocidad
+	//
+	// TODO: Leer https://www.gamedeveloper.com/audio/coding-to-the-beat---under-the-hood-of-a-rhythm-game-in-unity
 	fig.point_progress += rl.GetFrameTime()
 
 	// Cambiar de vértice
@@ -208,7 +227,6 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 		// Nuevo ciclo
 		if fig.point_seg_index == fig.n {
 			fig.point_seg_index = 0
-
 			if fig.point_counter > 0 do fig.point_counter -= 1
 		}
 	}
@@ -292,6 +310,53 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 
 		rl.DrawCircle(c.int(beat_point.x), c.int(beat_point.y), FIGURE_POINT_RADIUS, point_color)
 	}
+}
+
+@(private="file")
+check_collision_figure :: proc(pos: v2, fig: Regular_Figure) -> (collision: bool, segment: uint, progress: f32) {
+	diff := fig.center - fig.radius
+
+	vertex1 := fig.radius
+	vertex2: v2
+	for i in 1 ..< fig.n {
+		angle := 2 * m.PI * f32(i) / f32(fig.n)
+
+		vertex2.x = fig.center.x - (diff.x * m.cos(angle) - diff.y * m.sin(angle))
+		vertex2.y = fig.center.y - (diff.x * m.sin(angle) + diff.y * m.cos(angle))
+
+		if rl.CheckCollisionCircleLine(pos, FIGURE_SELECTOR_SIZE, vertex1, vertex2) {
+			collision = true
+			segment = i - 1
+			break
+		}
+
+		vertex1 = vertex2
+	}
+
+	// El último segmento se hace con primer vértice
+	if !collision && rl.CheckCollisionCircleLine(pos, FIGURE_SELECTOR_SIZE, vertex1, fig.radius) {
+		vertex2 = fig.radius
+		collision = true
+		segment = fig.n - 1
+	}
+
+	if !collision {
+		return
+	}
+
+	// https://ericleong.me/research/circle-line/ (modificado)
+	cx: f32
+	v   := vertex2 - vertex1
+	c1  := v.y * vertex1.x - v.x * vertex1.y
+	c2  := v.y * pos.y + v.x * pos.x
+	det := v.y * v.y + v.x * v.x
+	if det != 0 {
+		cx = (v.y * c1 + v.x * c2) / det
+		// (cx, cy) = vertex1 + k * v => despejar k
+		progress = (cx - vertex1.x) / v.x
+	}
+
+	return
 }
 
 render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color := FIGURE_BEAT_COLOR) {
