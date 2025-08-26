@@ -18,11 +18,11 @@ WINDOW_SIZE :: iv2 {1280, 720}
 
 Music_Notes :: enum u8 {
 	// TODO: Añadir más notas?
-	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep
+	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep, Null
 }
 
 // Técnicamente una constante. No cambiar :(
-STRING_NOTES := [Music_Notes]cstring{
+STRING_NOTES := [Music_Notes]cstring {
 	.Do = "Do",
 	.Re = "Re",
 	.Mi = "Mi",
@@ -31,8 +31,11 @@ STRING_NOTES := [Music_Notes]cstring{
 	.La = "La",
 	.Si = "Si",
 	.Dop = "Dop",
-	.Rep = "Rep"
+	.Rep = "Rep",
+	.Null = "---"
 }
+
+
 
 // ==== GAME DATA =============================================================
 
