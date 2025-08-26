@@ -17,19 +17,19 @@ WINDOW_NAME :: "Synth Shapes"
 WINDOW_SIZE :: iv2 {1280, 720}
 
 Music_Notes :: enum u8 {
+	// TODO: Añadir más notas?
 	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep
-	// TODO: No sé si añadir estas, sino habría que añadir el resto también: Do' Re'
 }
 
-//Técnicamente una constante. No cambiar :(
+// Técnicamente una constante. No cambiar :(
 STRING_NOTES := [Music_Notes]cstring{
-    .Do = "Do",
-    .Re = "Re",
-    .Mi = "Mi",
-    .Fa = "Fa",
-    .Sol = "Sol",
-    .La = "La",
-    .Si = "Si",
+	.Do = "Do",
+	.Re = "Re",
+	.Mi = "Mi",
+	.Fa = "Fa",
+	.Sol = "Sol",
+	.La = "La",
+	.Si = "Si",
 	.Dop = "Dop",
 	.Rep = "Rep"
 }
@@ -81,8 +81,8 @@ init :: proc() {
 	game_state.music_notes[.Sol] = rl.LoadSound("assets/sounds/Sol.wav")
 	game_state.music_notes[.La]  = rl.LoadSound("assets/sounds/La.wav")
 	game_state.music_notes[.Si]  = rl.LoadSound("assets/sounds/Si.wav")
-	// game_state.music_notes[7] = rl.LoadSound("assets/sounds/Do'.wav")
-	// game_state.music_notes[8] = rl.LoadSound("assets/sounds/Re'.wav")
+	game_state.music_notes[.Dop] = rl.LoadSound("assets/sounds/Do'.wav")
+	game_state.music_notes[.Rep] = rl.LoadSound("assets/sounds/Re'.wav")
 
 	// No cerrar en escape
 	rl.SetExitKey(.KEY_NULL)
@@ -131,8 +131,8 @@ update :: proc() {
 
 	// Render la figura seleccionada en un color distinto
 	// PERF: Se dibujará 2 veces la figura seleccionada
-	if game_state.state == .New_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
-		render_regular_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
+	if game_state.state == .Edit_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
+		render_selected_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
 		render_figure_ui()
 	}
 
