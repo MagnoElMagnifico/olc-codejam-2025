@@ -39,6 +39,7 @@ Regular_Figure :: struct {
 	notes: [25]Music_Notes,
 }
 
+//TODO: Pulsar el botón delete hace crashear el juego
 delete_current_figure :: proc() {
 	using game_state
 	assert(
