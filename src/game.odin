@@ -120,10 +120,7 @@ update :: proc() {
 	// Render la figura seleccionada en un color distinto
 	// PERF: Se dibujará 2 veces la figura seleccionada
 	if game_state.state == .New_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
-
 		render_regular_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
-
-		// TODO: Esto aquí no funciona del todo bien
 		render_figure_ui()
 	}
 
