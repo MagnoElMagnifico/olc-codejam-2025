@@ -16,9 +16,22 @@ rect :: rl.Rectangle // { x, y, width, height: f32 }
 WINDOW_NAME :: "Synth Shapes"
 WINDOW_SIZE :: iv2 {1280, 720}
 
-Music_Notes :: enum {
-	Do, Re, Mi, Fa, Sol, La, Si,
+Music_Notes :: enum u8 {
+	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep
 	// TODO: No sé si añadir estas, sino habría que añadir el resto también: Do' Re'
+}
+
+//Técnicamente una constante. No cambiar :(
+STRING_NOTES := [Music_Notes]cstring{
+    .Do = "Do",
+    .Re = "Re",
+    .Mi = "Mi",
+    .Fa = "Fa",
+    .Sol = "Sol",
+    .La = "La",
+    .Si = "Si",
+	.Dop = "Dop",
+	.Rep = "Rep"
 }
 
 // ==== GAME DATA =============================================================

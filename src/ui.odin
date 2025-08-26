@@ -34,7 +34,6 @@ UI_REAL_PANEL_DIM :: rect {
 	4 * UI_LINE_HEIGHT + UI_PADDING
 }
 
-
 UI_figure_panel_dim := rect {
 	0,
 	UI_MARGIN,
@@ -161,12 +160,13 @@ render_create_figure_ui :: proc() {
 }
 
 render_figure_ui :: proc() {
+
 	if game_state.state == .View {
 		return
 	}
 
 	rl.GuiPanel(UI_figure_panel_dim, "Figure Options")
-	UI_figure_panel_dim.x = f32(rl.GetScreenWidth())-(UI_MARGIN+100 + 3*UI_LINE_HEIGHT + 3*UI_PADDING)
+	UI_figure_panel_dim.x = f32(game_state.window_size.x)-(UI_MARGIN+100 + 4*UI_LINE_HEIGHT + 3*UI_PADDING)
 	current_x : f32 = UI_figure_panel_dim.x + UI_PADDING
 	// f32(rl.GetScreenWidth())-UI_PADDING - UI_MARGIN - 300
 	current_y : f32 = UI_figure_panel_dim.y + UI_LINE_HEIGHT
@@ -174,9 +174,6 @@ render_figure_ui :: proc() {
 	using game_state.current_figure
 
 	// TODO: UI para las notas
-	rl.GuiLabel({current_x, current_y, 200, UI_LINE_HEIGHT}, "*GUI para mostrar notas:*")
-	current_y += UI_LINE_HEIGHT
-
 	// Número de lados de la figura
 	{
 		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Sides:")
@@ -228,6 +225,40 @@ render_figure_ui :: proc() {
 
 		if rl.GuiButton({current_x, current_y+UI_PADDING/2, 60, UI_BUTTON_SIZE}, "X") {
 			delete_current_figure()
+		}
+	}
+		
+	current_x = UI_figure_panel_dim.x + UI_PADDING
+	current_y += UI_LINE_HEIGHT
+	
+	//Adición de las notas
+	{	
+		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Sound Config:")
+		current_x = UI_figure_panel_dim.x + UI_PADDING
+		current_y += UI_LINE_HEIGHT
+
+		n:uint = 1
+
+		for note in 1..=game_state.current_figure.n {
+			rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Vertice")
+			rl.GuiLabel({current_x + 50, current_y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(n)))
+			current_x += 100 + UI_PADDING
+
+			if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
+				point_counter_start = min(point_counter_start + 1, 100)
+			}
+			current_x += UI_LINE_HEIGHT + UI_PADDING
+
+			rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, STRING_NOTES[game_state.current_figure.notes[n]])
+
+			current_x += UI_LINE_HEIGHT
+
+			if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") && point_counter_start != -1 {
+				point_counter_start = max(point_counter_start - 1, 0)
+			}
+			current_x = UI_figure_panel_dim.x + UI_PADDING
+			current_y += UI_LINE_HEIGHT
+			n += 1
 		}
 	}
 }

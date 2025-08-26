@@ -34,7 +34,7 @@ Regular_Figure :: struct {
 	point_counter: int,
 	point_counter_start: int,
 
-	notes: [dynamic]uint,
+	notes: [25]Music_Notes,
 }
 
 delete_current_figure :: proc() {
@@ -94,6 +94,7 @@ update_figure_mouse_input :: proc() {
 				state = .New_Figure
 
 				center := to_world(game_state.camera, rl.GetMousePosition())
+
 				append(&figures, Regular_Figure {
 					center = center,
 					radius = center,
@@ -285,7 +286,11 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color 
 			circle_center.y = fig.center.y - (diff.x * linalg.sin(angle) + diff.y * linalg.cos(angle))
 			circle_center = to_screen(camera, circle_center)
 
-			rl.DrawCircleLines(c.int(circle_center.x), c.int(circle_center.y), 5.0, color)
+			if i == 0 {
+				rl.DrawCircleLines(c.int(circle_center.x), c.int(circle_center.y), 5.0, rl.YELLOW)
+			}else{
+				rl.DrawCircleLines(c.int(circle_center.x), c.int(circle_center.y), 5.0, color)
+			}
 		}
 	}
 
