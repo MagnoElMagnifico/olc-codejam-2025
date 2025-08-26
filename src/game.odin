@@ -32,6 +32,7 @@ Game_State :: struct {
 	sync_points: bool,
 
 	ui: UI_State,
+	figure_ui: UI_Figure_State,
 	camera: Camera,
 	window_size: iv2,
 	music_notes: [9]rl.Sound
@@ -121,12 +122,13 @@ update :: proc() {
 	if game_state.state == .New_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
 		// TODO: se dibujará 2 veces la figura seleccionada
 		render_regular_figure(game_state.current_figure^, rl.RED)
+		render_figure_ui()
 	}
 
 	// Render UI: debe ejecutarse después de las figuras para que se muestre por
 	// encima.
 	render_ui()
-
+	
 
 	free_all(context.temp_allocator)
 }

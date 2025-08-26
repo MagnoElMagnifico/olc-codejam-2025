@@ -27,6 +27,7 @@ Regular_Figure :: struct {
 	point_seg_index: uint,
 	// Indica el progreso dentro del segmento actual
 	point_progress: f32,
+	notes: [dynamic] uint
 	// Indica el número de ciclos que le queda a la figura
 	// TODO: cómo representamos infinito?
 	// point_counter: uint,
