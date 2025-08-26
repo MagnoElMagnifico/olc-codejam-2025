@@ -39,6 +39,7 @@ update_figure_input :: proc() {
 		return
 	}
 
+
 	using game_state
 	switch state {
 	case .View: {
@@ -165,6 +166,7 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 	if fig.point_progress > 1.0 {
 		// TODO: el sonido se reproduce aquí, porque sabemos que acaba de
 		// cambiar de segmento
+		rl.PlaySound(game_state.music_notes[0])
 		fig.point_progress = 0.0
 		fig.point_seg_index = (fig.point_seg_index + 1) % (fig.n)
 		// fig.point_counter -= 1
@@ -183,7 +185,7 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 	rotation := linalg.atan(diff.y / diff.x) * linalg.DEG_PER_RAD
 
 	// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
-	if diff.x > 0 do rotation += 180
+	if diff.x >= 0 do rotation += 180
 
 	// Transformar coordenadas del mundo a coordenadas en la pantalla
 	using game_state

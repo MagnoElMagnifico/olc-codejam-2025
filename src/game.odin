@@ -4,6 +4,7 @@ package game
 
 import rl "vendor:raylib"
 import "core:c"
+import "core:log"
 
 // ==== CONSTANTS =============================================================
 
@@ -32,10 +33,13 @@ Game_State :: struct {
 
 	ui: UI_State,
 	camera: Camera,
-	window_size: iv2
+	window_size: iv2,
+	music_notes: [9]rl.Sound
 }
 
 // ==== GAME INIT =============================================================
+
+import "core:os"
 
 init :: proc() {
 	using game_state
@@ -50,6 +54,19 @@ init :: proc() {
 	rl.SetConfigFlags({.WINDOW_RESIZABLE, .MSAA_4X_HINT, .VSYNC_HINT})
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
 	rl.InitAudioDevice()
+
+	//TODO: La apertura del archivo falla. Pero teóricamente el path es correcto.
+	game_state.music_notes[0] = rl.LoadSound("/src/sounds/Do.wav")
+	game_state.music_notes[1] = rl.LoadSound("/src/sounds/Re.wav")
+	game_state.music_notes[2] = rl.LoadSound("/src/sounds/Mi.wav")
+	game_state.music_notes[3] = rl.LoadSound("/src/sounds/Fa.wav")
+	game_state.music_notes[4] = rl.LoadSound("/src/sounds/Sol.wav")
+	game_state.music_notes[5] = rl.LoadSound("/src/sounds/La.wav")
+	game_state.music_notes[6] = rl.LoadSound("/src/sounds/Si.wav")
+	game_state.music_notes[7] = rl.LoadSound("/src/sounds/Do'.wav")
+	game_state.music_notes[8] = rl.LoadSound("/src/sounds/Re'.wav")
+
+	log.info(os.args[0])
 
 	// No cerrar en escape
 	rl.SetExitKey(.KEY_NULL)
@@ -78,8 +95,14 @@ update :: proc() {
 	rl.ClearBackground({30, 30, 30, 255})
 
 	if game_state.sync_points {
-		for &f in game_state.figures {
-			reset_figure_state(&f)
+		if game_state.state == .New_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
+			//Resetear solo la seleccionada
+			reset_figure_state(game_state.current_figure)
+		}else{
+			//Si ninguna está seleccionada, resetea todas
+			for &f in game_state.figures {
+				reset_figure_state(&f)
+			}
 		}
 		game_state.sync_points = false
 	}
@@ -104,6 +127,7 @@ update :: proc() {
 	// encima.
 	render_ui()
 
+
 	free_all(context.temp_allocator)
 }
 
@@ -118,6 +142,10 @@ parent_window_size_changed :: proc(w, h: c.int) {
 }
 
 shutdown :: proc() {
+	for music_note in game_state.music_notes {
+		rl.UnloadSound(music_note)
+	}
+	rl.CloseAudioDevice()
 	rl.CloseWindow()
 }
 

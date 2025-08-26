@@ -118,7 +118,7 @@ render_ui :: proc() {
 
 	//Sincronizar puntos
 	{
-		rl.GuiLabel({current_x, current_y, 60, UI_LINE_HEIGHT}, "Sync points -> ")
+		rl.GuiLabel({current_x, current_y, 80, UI_LINE_HEIGHT}, "Restart beat(s)")
 		current_x += 100 + UI_PADDING
 		if rl.GuiButton({current_x, current_y+UI_PADDING/2, 60, UI_LINE_HEIGHT-UI_PADDING}, "X") {
 			game_state.sync_points = true
