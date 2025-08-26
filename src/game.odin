@@ -16,26 +16,31 @@ rect :: rl.Rectangle // { x, y, width, height: f32 }
 WINDOW_NAME :: "Synth Shapes"
 WINDOW_SIZE :: iv2 {1280, 720}
 
+Music_Notes :: enum {
+	Do, Re, Mi, Fa, Sol, La, Si,
+	// TODO: No sé si añadir estas, sino habría que añadir el resto también: Do' Re'
+}
+
 // ==== GAME DATA =============================================================
 
 game_state: Game_State
 Game_State :: struct {
-	run: bool, // Determina si seguir ejecutando el game loop
-	simulation_running: bool, // Determina si mover los puntos de las figuras
+	// ==== State ====
+	run: bool,                       // Determina si seguir ejecutando el game loop
+	simulation_running: bool,        // Determina si mover los puntos de las figuras
+	state: Selection_State,          // Determinar qué hacen las acciones del ratón
+	current_figure: ^Regular_Figure, // nil: nada seleccionado
 
+	// ==== Objects ====
 	figures: [dynamic]Regular_Figure,
-
-	// Determinar qué hacen las acciones del ratón
-	state: Selection_State,
-	// nil: nada seleccionado
-	current_figure: ^Regular_Figure,
-	sync_points: bool,
-
-	ui: UI_State,
-	figure_ui: UI_Figure_State,
 	camera: Camera,
+	create_figure_ui: UI_Create_State,
+
+	// ==== Information ====
 	window_size: iv2,
-	music_notes: [9]rl.Sound
+
+	// ==== Resources ====
+	music_notes: [Music_Notes]rl.Sound
 }
 
 // ==== GAME INIT =============================================================
@@ -48,26 +53,24 @@ init :: proc() {
 	run = true
 	simulation_running = true
 	camera.zoom = 1.0
-	ui.n_sides = 3
+	create_figure_ui.n_sides = 3
+	create_figure_ui.counter = -1
 	window_size = WINDOW_SIZE
-	set_text_to_number(ui.sides_text[:], ui.n_sides)
 
 	rl.SetConfigFlags({.WINDOW_RESIZABLE, .MSAA_4X_HINT, .VSYNC_HINT})
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
 	rl.InitAudioDevice()
 
-	//TODO: La apertura del archivo falla. Pero teóricamente el path es correcto.
-	game_state.music_notes[0] = rl.LoadSound("/src/sounds/Do.wav")
-	game_state.music_notes[1] = rl.LoadSound("/src/sounds/Re.wav")
-	game_state.music_notes[2] = rl.LoadSound("/src/sounds/Mi.wav")
-	game_state.music_notes[3] = rl.LoadSound("/src/sounds/Fa.wav")
-	game_state.music_notes[4] = rl.LoadSound("/src/sounds/Sol.wav")
-	game_state.music_notes[5] = rl.LoadSound("/src/sounds/La.wav")
-	game_state.music_notes[6] = rl.LoadSound("/src/sounds/Si.wav")
-	game_state.music_notes[7] = rl.LoadSound("/src/sounds/Do'.wav")
-	game_state.music_notes[8] = rl.LoadSound("/src/sounds/Re'.wav")
-
-	log.info(os.args[0])
+	// TODO: La apertura del archivo falla. Pero teóricamente el path es correcto.
+	game_state.music_notes[.Do]  = rl.LoadSound("assets/sounds/Do.wav")
+	game_state.music_notes[.Re]  = rl.LoadSound("assets/sounds/Re.wav")
+	game_state.music_notes[.Mi]  = rl.LoadSound("assets/sounds/Mi.wav")
+	game_state.music_notes[.Fa]  = rl.LoadSound("assets/sounds/Fa.wav")
+	game_state.music_notes[.Sol] = rl.LoadSound("assets/sounds/Sol.wav")
+	game_state.music_notes[.La]  = rl.LoadSound("assets/sounds/La.wav")
+	game_state.music_notes[.Si]  = rl.LoadSound("assets/sounds/Si.wav")
+	// game_state.music_notes[7] = rl.LoadSound("assets/sounds/Do'.wav")
+	// game_state.music_notes[8] = rl.LoadSound("assets/sounds/Re'.wav")
 
 	// No cerrar en escape
 	rl.SetExitKey(.KEY_NULL)
@@ -83,10 +86,19 @@ update :: proc() {
 
 	// ==== Game input handling ===============================================
 	update_camera()
-	update_figure_input()
+	update_figure_mouse_input()
 
 	if rl.IsKeyPressed(.SPACE) {
 		game_state.simulation_running = !game_state.simulation_running
+	}
+
+	if rl.IsKeyPressed(.ESCAPE) {
+		game_state.current_figure = nil
+		game_state.state = .View
+	}
+
+	if game_state.current_figure != nil && (rl.IsKeyPressed(.BACKSPACE) || rl.IsKeyPressed(.DELETE)) {
+		delete_current_figure()
 	}
 
 	// ==== Render ============================================================
@@ -94,19 +106,6 @@ update :: proc() {
 	defer rl.EndDrawing()
 
 	rl.ClearBackground({30, 30, 30, 255})
-
-	if game_state.sync_points {
-		if game_state.state == .New_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
-			//Resetear solo la seleccionada
-			reset_figure_state(game_state.current_figure)
-		}else{
-			//Si ninguna está seleccionada, resetea todas
-			for &f in game_state.figures {
-				reset_figure_state(&f)
-			}
-		}
-		game_state.sync_points = false
-	}
 
 	// Render todas las figuras
 	for &f in game_state.figures {
@@ -119,16 +118,16 @@ update :: proc() {
 	}
 
 	// Render la figura seleccionada en un color distinto
+	// PERF: Se dibujará 2 veces la figura seleccionada
 	if game_state.state == .New_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
-		// TODO: se dibujará 2 veces la figura seleccionada
-		render_regular_figure(game_state.current_figure^, rl.RED)
+		render_regular_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
 		render_figure_ui()
 	}
 
 	// Render UI: debe ejecutarse después de las figuras para que se muestre por
 	// encima.
-	render_ui()
-	
+	render_create_figure_ui()
+	render_debug_info()
 
 	free_all(context.temp_allocator)
 }
