@@ -64,7 +64,7 @@ update_figure_mouse_input :: proc() {
 		return
 	}
 
-	if state == .Selected_Figure && rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_FIGURE_PANEL_DIM) {
+	if state == .Selected_Figure && rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_figure_panel_dim) {
 		return
 	}
 

@@ -26,14 +26,6 @@ UI_PANEL_DIM :: rect {
 	/* ALTO: cabecera + 4 filas + padding final */ 5 * UI_LINE_HEIGHT + UI_PADDING,
 }
 
-//1280, 720
-UI_FIGURE_PANEL_DIM := rect {
-	f32(rl.GetScreenWidth())-(UI_MARGIN+100 + 3*UI_LINE_HEIGHT + 3*UI_PADDING),
-	UI_MARGIN,
-	100 + 3*UI_LINE_HEIGHT + 3*UI_PADDING,
-	f32(UI_figure_height)*UI_LINE_HEIGHT+UI_PADDING
-}
-
 // Tamaño del panel UI para dar a raylib
 UI_REAL_PANEL_DIM :: rect {
 	UI_MARGIN,
@@ -44,7 +36,7 @@ UI_REAL_PANEL_DIM :: rect {
 
 
 UI_figure_panel_dim := rect {
-	f32(rl.GetScreenWidth())-(UI_MARGIN+100 + 3*UI_LINE_HEIGHT + 3*UI_PADDING),
+	0,
 	UI_MARGIN,
 	100 + 3*UI_LINE_HEIGHT + 3*UI_PADDING,
 	f32(UI_figure_height)*UI_LINE_HEIGHT+UI_PADDING
@@ -69,8 +61,6 @@ cstr_from_int :: proc(n: int, allocator := context.temp_allocator, loc := #calle
 render_create_figure_ui :: proc() {
 	// TODO: customizar estilos, se ve bastante como la caca
 	using game_state.create_figure_ui
-
-	UI_figure_panel_dim.x = f32(rl.GetScreenWidth())-(UI_MARGIN+100 + 3*UI_LINE_HEIGHT + 3*UI_PADDING)
 
 	rl.GuiPanel(UI_PANEL_DIM, "Create figure")
 
@@ -174,11 +164,12 @@ render_figure_ui :: proc() {
 	if game_state.state == .View {
 		return
 	}
-	
-	rl.GuiPanel(UI_FIGURE_PANEL_DIM, "Figure Options")
-	current_x : f32 = UI_FIGURE_PANEL_DIM.x + UI_PADDING
+
+	rl.GuiPanel(UI_figure_panel_dim, "Figure Options")
+	UI_figure_panel_dim.x = f32(rl.GetScreenWidth())-(UI_MARGIN+100 + 3*UI_LINE_HEIGHT + 3*UI_PADDING)
+	current_x : f32 = UI_figure_panel_dim.x + UI_PADDING
 	// f32(rl.GetScreenWidth())-UI_PADDING - UI_MARGIN - 300
-	current_y : f32 = UI_FIGURE_PANEL_DIM.y + UI_LINE_HEIGHT
+	current_y : f32 = UI_figure_panel_dim.y + UI_LINE_HEIGHT
 
 	using game_state.current_figure
 
@@ -203,7 +194,7 @@ render_figure_ui :: proc() {
 		current_x += UI_LINE_HEIGHT + UI_PADDING
 	}
 
-	current_x = UI_FIGURE_PANEL_DIM.x + UI_PADDING
+	current_x = UI_figure_panel_dim.x + UI_PADDING
 	current_y += UI_LINE_HEIGHT
 
 	// Contador inicial de la figura
@@ -227,7 +218,7 @@ render_figure_ui :: proc() {
 		}
 	}
 
-	current_x = UI_FIGURE_PANEL_DIM.x + UI_PADDING
+	current_x = UI_figure_panel_dim.x + UI_PADDING
 	current_y += UI_LINE_HEIGHT
 
 	// Borrar figura
