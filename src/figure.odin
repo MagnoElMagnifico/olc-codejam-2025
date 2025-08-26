@@ -9,6 +9,8 @@ import "core:math/linalg"
 FIGURE_SELECTOR_SIZE       :: 10
 FIGURE_MIN_RADIUS_SELECTOR :: 20
 FIGURE_MIN_RADIUS          :: 3.0
+FIGURE_SELECTED_COLOR      :: rl.RED
+FIGURE_POINT_COLOR         :: rl.SKYBLUE
 
 Selection_State :: enum {
 	View = 0,
@@ -27,10 +29,10 @@ Regular_Figure :: struct {
 	point_seg_index: uint,
 	// Indica el progreso dentro del segmento actual
 	point_progress: f32,
-	notes: [dynamic] uint
-	// Indica el número de ciclos que le queda a la figura
-	// TODO: cómo representamos infinito?
-	// point_counter: uint,
+	// Indica el número de ciclos que le queda a la figura (infinito es -1)
+	point_counter: int,
+
+	notes: [dynamic] uint,
 }
 
 
@@ -39,7 +41,6 @@ update_figure_input :: proc() {
 	if rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_PANEL_DIM) {
 		return
 	}
-
 
 	using game_state
 	switch state {
@@ -72,6 +73,9 @@ update_figure_input :: proc() {
 					center = center,
 					radius = center,
 					n = ui.n_sides,
+					point_seg_index = 0,
+					point_progress = 0,
+					point_counter = ui.counter,
 				})
 
 				current_figure = &figures[len(figures)-1]
@@ -149,39 +153,58 @@ update_figure_input :: proc() {
 	if state == .Selected_Figure {
 		// Actualizar UI con su numero de lados
 		ui.n_sides = current_figure.n
-		set_text_to_number(ui.sides_text[:], ui.n_sides)
 	}
 }
 
 
 update_figure_state :: proc(fig: ^Regular_Figure) {
 	// No procesar figuras que no tienen contador
-	/*if fig.point_counter <= 0 {
+	if fig.point_counter == 0 {
 		return
-	}*/
+	}
 
-	// TODO: hacer bien el deltatime, ya que esta aplicación requiere de un
-	// ritmo bastante preciso: https://youtu.be/yGhfUcPjXuE
 	fig.point_progress += rl.GetFrameTime()
 
+	// Cambiar de vértice
 	if fig.point_progress > 1.0 {
-		// TODO: el sonido se reproduce aquí, porque sabemos que acaba de
-		// cambiar de segmento
 		rl.PlaySound(game_state.music_notes[0])
 		fig.point_progress = 0.0
-		fig.point_seg_index = (fig.point_seg_index + 1) % (fig.n)
-		// fig.point_counter -= 1
+
+		// Nuevo ciclo
+		if fig.point_seg_index == fig.n {
+			fig.point_seg_index = 0
+
+			if fig.point_counter > 0 do fig.point_counter -= 1
+		}
 	}
 }
 
 reset_figure_state :: proc(fig: ^Regular_Figure) {
 	fig.point_seg_index = 0
 	fig.point_progress = 0
-	// fig.point_counter = 0
+
+	// TODO: guardar un valor inicial?
+	fig.point_counter = -1
 }
 
 
-render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
+render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color := FIGURE_POINT_COLOR) {
+	// Los parámetros son inmutables por defecto, pero con lo siguiente sí puedo
+	// modificarlos
+	color := color
+	point_color := point_color
+
+	// Cambiar los colores en función del contador
+	if fig.point_counter == 0 {
+		color = {
+			u8(f32(color.r) * 0.6),
+			u8(f32(color.b) * 0.6),
+			u8(f32(color.g) * 0.6),
+			color.a,
+		}
+		point_color = color
+	}
+
 	diff := fig.center - fig.radius
 	rotation := linalg.atan(diff.y / diff.x) * linalg.DEG_PER_RAD
 
@@ -202,7 +225,20 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 	)
 
 	if screen_radius > FIGURE_MIN_RADIUS_SELECTOR {
-		rl.DrawCircleLines(c.int(screen_center.x), c.int(screen_center.y), FIGURE_SELECTOR_SIZE, color)
+		c_screen_center := iv2 {c.int(screen_center.x), c.int(screen_center.y)}
+		rl.DrawCircleLines(c_screen_center.x, c_screen_center.y, FIGURE_SELECTOR_SIZE, color)
+
+		counter_str := cstr_from_int(fig.point_counter)
+		text_width := rl.MeasureText(counter_str, UI_FONT_SIZE)
+		c_screen_center.x -= text_width/2
+		c_screen_center.y -= UI_FONT_SIZE/2
+
+		rl.DrawText(
+			counter_str,
+			c_screen_center.x, c_screen_center.y,
+			UI_FONT_SIZE,
+			color
+		)
 	}
 
 	// Dibujar los vértices
@@ -232,7 +268,8 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 	}
 
 	// Dibujar el punto
-	/*if fig.point_counter > 0*/ {
+	// TODO: desactivar cuando no quede contador o seguir renderizando?
+	{
 		// Calcular puntos del segmento actual: igual que en el bucle
 		angle1 := linalg.to_radians(360 * f32(fig.point_seg_index)     / f32(fig.n))
 		angle2 := linalg.to_radians(360 * f32(fig.point_seg_index + 1) / f32(fig.n))
@@ -254,7 +291,7 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 		beat_point := point1 + fig.point_progress * line_vector
 		beat_point = to_screen(camera, beat_point)
 
-		rl.DrawCircle(c.int(beat_point.x), c.int(beat_point.y), 5.0, rl.SKYBLUE)
+		rl.DrawCircle(c.int(beat_point.x), c.int(beat_point.y), 5.0, point_color)
 	}
 }
 

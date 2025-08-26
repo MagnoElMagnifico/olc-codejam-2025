@@ -49,23 +49,23 @@ init :: proc() {
 	simulation_running = true
 	camera.zoom = 1.0
 	ui.n_sides = 3
+	ui.counter = -1
 	window_size = WINDOW_SIZE
-	set_text_to_number(ui.sides_text[:], ui.n_sides)
 
 	rl.SetConfigFlags({.WINDOW_RESIZABLE, .MSAA_4X_HINT, .VSYNC_HINT})
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
 	rl.InitAudioDevice()
 
-	//TODO: La apertura del archivo falla. Pero teóricamente el path es correcto.
-	game_state.music_notes[0] = rl.LoadSound("/src/sounds/Do.wav")
-	game_state.music_notes[1] = rl.LoadSound("/src/sounds/Re.wav")
-	game_state.music_notes[2] = rl.LoadSound("/src/sounds/Mi.wav")
-	game_state.music_notes[3] = rl.LoadSound("/src/sounds/Fa.wav")
-	game_state.music_notes[4] = rl.LoadSound("/src/sounds/Sol.wav")
-	game_state.music_notes[5] = rl.LoadSound("/src/sounds/La.wav")
-	game_state.music_notes[6] = rl.LoadSound("/src/sounds/Si.wav")
-	game_state.music_notes[7] = rl.LoadSound("/src/sounds/Do'.wav")
-	game_state.music_notes[8] = rl.LoadSound("/src/sounds/Re'.wav")
+	// TODO: La apertura del archivo falla. Pero teóricamente el path es correcto.
+	game_state.music_notes[0] = rl.LoadSound("assets/sounds/Do.wav")
+	game_state.music_notes[1] = rl.LoadSound("assets/sounds/Re.wav")
+	game_state.music_notes[2] = rl.LoadSound("assets/sounds/Mi.wav")
+	game_state.music_notes[3] = rl.LoadSound("assets/sounds/Fa.wav")
+	game_state.music_notes[4] = rl.LoadSound("assets/sounds/Sol.wav")
+	game_state.music_notes[5] = rl.LoadSound("assets/sounds/La.wav")
+	game_state.music_notes[6] = rl.LoadSound("assets/sounds/Si.wav")
+	game_state.music_notes[7] = rl.LoadSound("assets/sounds/Do'.wav")
+	game_state.music_notes[8] = rl.LoadSound("assets/sounds/Re'.wav")
 
 	log.info(os.args[0])
 
@@ -128,7 +128,7 @@ update :: proc() {
 	// Render UI: debe ejecutarse después de las figuras para que se muestre por
 	// encima.
 	render_ui()
-	
+	render_debug_info()
 
 	free_all(context.temp_allocator)
 }
