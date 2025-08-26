@@ -5,6 +5,7 @@ import rl "vendor:raylib"
 import "core:c"
 import "core:log"
 import "core:math/linalg"
+import "core:mem"
 
 FIGURE_SELECTOR_SIZE       :: 10
 FIGURE_MIN_RADIUS_SELECTOR :: 20
@@ -31,18 +32,42 @@ Regular_Figure :: struct {
 	point_progress: f32,
 	// Indica el número de ciclos que le queda a la figura (infinito es -1)
 	point_counter: int,
+	point_counter_start: int,
 
-	notes: [dynamic] uint,
+	notes: [dynamic]uint,
+}
+
+delete_current_figure :: proc() {
+	using game_state
+	assert(
+		current_figure != nil && (state == .New_Figure ||
+		state == .Selected_Figure ||
+		state == .Move_Figure),
+		"para borrar una figura, esta debe estar seleccionada"
+	)
+
+	// Mueve el último elemento al actual y reduce la longitud
+	index := mem.ptr_sub(current_figure, &figures[0])
+	unordered_remove(&figures, index)
+
+	state = .View
+	current_figure = nil
 }
 
 
-update_figure_input :: proc() {
+// WARN: Solo poner código que relaciado con el ratón, no eventos de teclado
+update_figure_mouse_input :: proc() {
+	using game_state
+
 	// Ignorar eventos mientras se está en la UI
-	if rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_PANEL_DIM) {
+	if state != .Move_Figure && rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_PANEL_DIM) {
 		return
 	}
 
-	using game_state
+	if state == .Selected_Figure && rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_FIGURE_PANEL_DIM) {
+		return
+	}
+
 	switch state {
 	case .View: {
 		assert(current_figure == nil, "En modo .View, current_figure debe ser nil")
@@ -72,10 +97,11 @@ update_figure_input :: proc() {
 				append(&figures, Regular_Figure {
 					center = center,
 					radius = center,
-					n = ui.n_sides,
+					n = create_figure_ui.n_sides,
 					point_seg_index = 0,
 					point_progress = 0,
-					point_counter = ui.counter,
+					point_counter_start = create_figure_ui.counter,
+					point_counter = create_figure_ui.counter,
 				})
 
 				current_figure = &figures[len(figures)-1]
@@ -148,12 +174,6 @@ update_figure_input :: proc() {
 		}
 	}
 	}
-
-	// Actualizar UI tras los cambios de estado
-	if state == .Selected_Figure {
-		// Actualizar UI con su numero de lados
-		ui.n_sides = current_figure.n
-	}
 }
 
 
@@ -167,8 +187,9 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 
 	// Cambiar de vértice
 	if fig.point_progress > 1.0 {
-		rl.PlaySound(game_state.music_notes[0])
+		rl.PlaySound(game_state.music_notes[.Do])
 		fig.point_progress = 0.0
+		fig.point_seg_index += 1
 
 		// Nuevo ciclo
 		if fig.point_seg_index == fig.n {
@@ -178,15 +199,6 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 		}
 	}
 }
-
-reset_figure_state :: proc(fig: ^Regular_Figure) {
-	fig.point_seg_index = 0
-	fig.point_progress = 0
-
-	// TODO: guardar un valor inicial?
-	fig.point_counter = -1
-}
-
 
 render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color := FIGURE_POINT_COLOR) {
 	// Los parámetros son inmutables por defecto, pero con lo siguiente sí puedo
