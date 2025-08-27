@@ -45,9 +45,11 @@ Game_State :: struct {
 	simulation_running: bool,        // Determina si mover los puntos de las figuras
 	state: Selection_State,          // Determinar qué hacen las acciones del ratón
 
-	// BUG: puede que tengamos que cambiar los punteros por índices
-	current_figure: ^Regular_Figure, // nil: nada seleccionado
+	// El uso de las siguientes variables depende de `state`
+	current_figure: ^Regular_Figure,
 	selected_figures: [dynamic]^Regular_Figure,
+	selection_rect: rect,
+	selection_rect_center: v2,
 
 	// ==== Objects ====
 	figures: [dynamic]Regular_Figure,
@@ -101,9 +103,10 @@ update :: proc() {
 		parent_window_size_changed(rl.GetScreenWidth(), rl.GetScreenHeight())
 	}
 
-	// ==== Game input handling ===============================================
+	// ==== Input handling ====================================================
+
 	update_camera()
-	update_figure_mouse_input()
+	update_figure_selection()
 
 	if rl.IsKeyPressed(.SPACE) {
 		game_state.simulation_running = !game_state.simulation_running
@@ -120,36 +123,50 @@ update :: proc() {
 		else if game_state.state == .Multiselection do delete_multiselected_figures()
 	}
 
+
 	// ==== Render ============================================================
 	rl.BeginDrawing()
 	defer rl.EndDrawing()
 
 	rl.ClearBackground({30, 30, 30, 255})
 
-	// Render todas las figuras
 	for &f in game_state.figures {
-		// PERF: quizá mover el if a su propio bucle, pero el branch predictor
-		// lo detectará bien porque es constante
+		// Esto es mejor que actualizar todo y luego renderizar: solo se
+		// recorren todas las figuras una vez. El `if` no importa mucho porque
+		// es constante y el branch predictor lo detectará bien.
 		if game_state.simulation_running {
 			update_figure_state(&f)
 		}
-		render_regular_figure(f, rl.WHITE)
+
+		render_regular_figure(f, FIGURE_VIEW_COLOR)
 	}
 
 	// Render la figura seleccionada en un color distinto
 	// PERF: Se dibujarán 2 veces las figuras seleccionadas
-	if game_state.state == .Edit_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
+	switch game_state.state {
+	case .View: break
+
+	case .Edit_Figure: fallthrough
+	case .Selected_Figure: fallthrough
+	case .Move_Figure:
 		render_selected_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
 		render_figure_ui()
-	} else if game_state.state == .Multiselection {
+
+	case .Multiselection: fallthrough
+	case .Multiselection_Move:
 		for fig in game_state.selected_figures {
 			render_regular_figure(fig^, FIGURE_SELECTED_COLOR, FIGURE_SELECTED_COLOR, false)
 		}
+
+	case .Rectangle_Multiselection:
+		rl.DrawRectangleRec(game_state.selection_rect, SELECTION_RECT_COLOR)
 	}
 
-	// Render UI: debe ejecutarse después de las figuras para que se muestre por
-	// encima. Esto puede ser molesto porque el frame ya se ha dibujado,
-	// entonces el input de la UI se procesará para el siguiente frame.
+	// ==== UI ================================================================
+	// Debe ejecutarse después de las figuras para que se muestre por encima.
+	// Esto puede ser molesto porque el frame ya se ha dibujado, entonces el
+	// input de la UI se procesará para el siguiente frame.
+
 	render_create_figure_ui()
 	render_debug_info()
 
