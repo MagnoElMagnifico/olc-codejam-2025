@@ -44,7 +44,10 @@ Game_State :: struct {
 	run: bool,                       // Determina si seguir ejecutando el game loop
 	simulation_running: bool,        // Determina si mover los puntos de las figuras
 	state: Selection_State,          // Determinar qué hacen las acciones del ratón
+
+	// BUG: puede que tengamos que cambiar los punteros por índices
 	current_figure: ^Regular_Figure, // nil: nada seleccionado
+	selected_figures: [dynamic]^Regular_Figure,
 
 	// ==== Objects ====
 	figures: [dynamic]Regular_Figure,
@@ -108,11 +111,13 @@ update :: proc() {
 
 	if rl.IsKeyPressed(.ESCAPE) {
 		game_state.current_figure = nil
+		clear(&game_state.selected_figures)
 		game_state.state = .View
 	}
 
-	if game_state.current_figure != nil && (rl.IsKeyPressed(.BACKSPACE) || rl.IsKeyPressed(.DELETE)) {
-		delete_current_figure()
+	if rl.IsKeyPressed(.BACKSPACE) || rl.IsKeyPressed(.DELETE) {
+		if game_state.current_figure != nil do delete_current_figure()
+		else if game_state.state == .Multiselection do delete_multiselected_figures()
 	}
 
 	// ==== Render ============================================================
@@ -132,10 +137,14 @@ update :: proc() {
 	}
 
 	// Render la figura seleccionada en un color distinto
-	// PERF: Se dibujará 2 veces la figura seleccionada
+	// PERF: Se dibujarán 2 veces las figuras seleccionadas
 	if game_state.state == .Edit_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
 		render_selected_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
 		render_figure_ui()
+	} else if game_state.state == .Multiselection {
+		for fig in game_state.selected_figures {
+			render_regular_figure(fig^, FIGURE_SELECTED_COLOR, FIGURE_SELECTED_COLOR, false)
+		}
 	}
 
 	// Render UI: debe ejecutarse después de las figuras para que se muestre por

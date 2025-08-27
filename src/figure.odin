@@ -20,6 +20,7 @@ Selection_State :: enum {
 	View = 0,
 	Edit_Figure,
 	Selected_Figure,
+	Multiselection,
 	Move_Figure,
 }
 
@@ -92,7 +93,7 @@ update_figure_mouse_input :: proc() {
 	}
 
 	case .Edit_Figure: {
-		assert(current_figure != nil, "Modo .New_Figure require una figura seleccionada")
+		assert(current_figure != nil, "Modo .New_Figure requiere una figura seleccionada")
 
 		if rl.IsMouseButtonDown(.LEFT) {
 			// TODO: para que sean números enteros, aquí hay que hacer
@@ -112,11 +113,22 @@ update_figure_mouse_input :: proc() {
 		}
 	}
 
+	case .Move_Figure: {
+		assert(current_figure != nil, "Modo .Move_Figure require una figura seleccionada")
+
+		if rl.IsMouseButtonDown(.LEFT) {
+			diff := current_figure.center - current_figure.radius
+			current_figure.center = to_world(camera, rl.GetMousePosition())
+			current_figure.radius = current_figure.center - diff
+		} else {
+			state = .Selected_Figure
+		}
+	}
+
 	case .Selected_Figure: {
 		assert(current_figure != nil, "Modo .Selected_Figure require una figura seleccionada")
 
 		if rl.IsMouseButtonPressed(.LEFT) {
-			// Comprobar si seleccionamos algo
 			mouse := rl.GetMousePosition()
 
 			if rl.CheckCollisionPointCircle(mouse, to_screen(camera, current_figure.radius), FIGURE_POINT_RADIUS) {
@@ -140,6 +152,21 @@ update_figure_mouse_input :: proc() {
 					// Deseleccionar si se hace click en otro lado
 					current_figure = nil
 					state = .View
+
+				} else if rl.IsKeyDown(.LEFT_SHIFT) {
+					// Borrar selección de antes
+					// TODO: debería estar vacía realmente
+					clear(&selected_figures)
+
+					// Añadir las figuras seleccionadas: la anterior y la nueva
+					assert(selected != current_figure, "unreachable: se manejó este caso en otra rama")
+					append(&selected_figures, current_figure)
+					append(&selected_figures, selected)
+					current_figure = nil
+
+					// Iniciar multiselección
+					state = .Multiselection
+
 				} else {
 					assert(selected != current_figure, "unreachable: se manejó este caso en otra rama")
 					// Seleccionar otra figura
@@ -149,15 +176,53 @@ update_figure_mouse_input :: proc() {
 		}
 	}
 
-	case .Move_Figure: {
-		assert(current_figure != nil, "Modo .Move_Figure require una figura seleccionada")
+	case .Multiselection: {
+		assert(current_figure == nil && len(selected_figures) != 0, "Modo .Multiselection requiere current_figure a nil y figuras en select_figures")
 
-		if rl.IsMouseButtonDown(.LEFT) {
-			diff := current_figure.center - current_figure.radius
-			current_figure.center = to_world(camera, rl.GetMousePosition())
-			current_figure.radius = current_figure.center - diff
-		} else {
-			state = .Selected_Figure
+		if rl.IsMouseButtonPressed(.LEFT) {
+			mouse := rl.GetMousePosition()
+			selected := select_figure()
+
+			if selected == nil {
+				// Se hizo click fuera de la selección para quitarla
+				clear(&selected_figures)
+				state = .View
+
+			} else if rl.IsKeyDown(.LEFT_SHIFT) || rl.IsKeyDown(.RIGHT_SHIFT) {
+				// Comprobar si ya existe esa figura en la selección
+				index_in_selection := -1
+				for fig, i in selected_figures {
+					if fig == selected {
+						index_in_selection = i
+						break
+					}
+				}
+
+				// Añadir si no está en la selección, quitar si está
+				if index_in_selection == -1 {
+					append(&selected_figures, selected)
+				} else {
+					unordered_remove(&selected_figures, index_in_selection)
+				}
+			} else {
+				// Comprobar si ya existe esa figura en la selección
+				index_in_selection := -1
+				for fig, i in selected_figures {
+					if fig == selected {
+						index_in_selection = i
+						break
+					}
+				}
+
+				if index_in_selection == -1 {
+					state = .Selected_Figure
+					current_figure = selected
+					clear(&selected_figures)
+				} else {
+					// TODO: Mover figuras seleccionadas
+					log.warn("sin implementar: mover figuras")
+				}
+			}
 		}
 	}
 	}
@@ -290,7 +355,7 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 	}
 }
 
-render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color := FIGURE_BEAT_COLOR) {
+render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color := FIGURE_BEAT_COLOR, fade := true) {
 	using game_state
 
 	// Los parámetros son inmutables por defecto, pero con lo siguiente sí puedo
@@ -299,7 +364,7 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color 
 	point_color := point_color
 
 	// Cambiar los colores en función del contador
-	if fig.point_counter == 0 {
+	if fade && fig.point_counter == 0 {
 		color = {
 			u8(f32(color.r) * 0.6),
 			u8(f32(color.b) * 0.6),
@@ -368,6 +433,24 @@ delete_current_figure :: proc() {
 	state = .View
 	current_figure = nil
 }
+
+delete_multiselected_figures :: proc() {
+	using game_state
+	assert(
+		current_figure == nil && state == .Multiselection,
+		"No está en modo Multiselect"
+	)
+
+	for f in selected_figures {
+		index := mem.ptr_sub(f, &figures[0])
+		// BUG: algunas veces peta porque el índice no está en rango
+		unordered_remove(&figures, index)
+	}
+
+	clear(&selected_figures)
+	state = .View
+}
+
 
 @(private="file")
 check_collision_figure :: proc(pos: v2, fig: Regular_Figure) -> (collision: bool, segment: uint, progress: f32) {

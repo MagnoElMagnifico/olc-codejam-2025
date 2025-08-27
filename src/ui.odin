@@ -116,12 +116,19 @@ render_create_figure_ui :: proc() {
 				using game_state.current_figure
 				point_seg_index = 0
 				point_progress = 0
-				// TODO: resetear contador también?
+
+			} else if game_state.state == .Multiselection {
+				for &f in game_state.selected_figures {
+					f.point_seg_index = 0
+					f.point_progress = 0
+				}
+
 			} else {
+				// TODO: borrar esta operación porque podría fastidiar el
+				// trabajo del usuario: desharía el sync creado manualmente
 				for &f in game_state.figures {
 					f.point_seg_index = 0
 					f.point_progress = 0
-					// TODO: resetear contador también?
 				}
 			}
 		}
@@ -139,6 +146,10 @@ render_create_figure_ui :: proc() {
 			if game_state.current_figure != nil {
 				using game_state.current_figure
 				point_counter = point_counter_start
+			} else if game_state.state == .Multiselection {
+				for &f in game_state.selected_figures {
+					f.point_counter = f.point_counter_start
+				}
 			} else {
 				for &f in game_state.figures {
 					f.point_counter = f.point_counter_start
@@ -323,23 +334,16 @@ render_figure_ui :: proc() {
 
 	current_x = UI_figure_panel_dim.x + UI_PADDING
 	current_y += UI_LINE_HEIGHT
+	// TODO: no queda con el tamaño correcto, es un poco más grande
 	UI_figure_panel_dim.height = current_y
 }
 
 render_debug_info :: proc() {
 	current_x : c.int = UI_MARGIN
-	current_y : c.int = game_state.window_size.y - 5 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
+	current_y : c.int = game_state.window_size.y - 6 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
 
 	rl.DrawText(
 		fmt.caprintf("state: %w\x00", game_state.state, context.temp_allocator),
-		current_x, current_y,
-		UI_FONT_SIZE,
-		rl.WHITE
-	)
-	current_y += UI_FONT_SIZE + UI_PADDING/2
-
-	rl.DrawText(
-		fmt.caprintf("simulation: %w\x00", game_state.simulation_running, context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
@@ -355,6 +359,14 @@ render_debug_info :: proc() {
 	current_y += UI_FONT_SIZE + UI_PADDING/2
 
 	rl.DrawText(
+		fmt.caprintf("simulation: %w\x00", game_state.simulation_running, context.temp_allocator),
+		current_x, current_y,
+		UI_FONT_SIZE,
+		rl.WHITE
+	)
+	current_y += UI_FONT_SIZE + UI_PADDING/2
+
+	rl.DrawText(
 		fmt.caprintf("zoom: %1.5f\x00", game_state.camera.zoom, context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
@@ -363,7 +375,22 @@ render_debug_info :: proc() {
 	current_y += UI_FONT_SIZE + UI_PADDING/2
 
 	rl.DrawText(
-		fmt.caprintf("n figures: %d\x00", len(game_state.figures), context.temp_allocator),
+		fmt.caprintf("n total figures: %d\x00", len(game_state.figures), context.temp_allocator),
+		current_x, current_y,
+		UI_FONT_SIZE,
+		rl.WHITE
+	)
+	current_y += UI_FONT_SIZE + UI_PADDING/2
+
+	n_selected := 0
+	if game_state.state == .Multiselection {
+		n_selected = len(game_state.selected_figures)
+	} else if game_state.current_figure != nil {
+		n_selected = 1
+	}
+
+	rl.DrawText(
+		fmt.caprintf("figures selected: %d\x00", n_selected, context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
