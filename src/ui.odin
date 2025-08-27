@@ -23,6 +23,10 @@ UI_PANEL_DIM :: rect {
 
 // TODO: mover a game_state
 bpm_text : [dynamic]u8
+char_count := 1
+textBox := rl.Rectangle({0, 0, 50, UI_LINE_HEIGHT - 15 })
+mouse_on_text := false
+
 UI_figure_panel_dim := rect {
 	0, UI_MARGIN,
 	// 150 + 3*UI_LINE_HEIGHT + 3*UI_PADDING,
@@ -255,15 +259,38 @@ render_figure_ui :: proc() {
 	}
 	
 	// BPM config
+
+	if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
+		append(&bpm_text,49) //60 es el valor inicial
+		append(&bpm_text,0)
+	}
+
+	buf: [32]u8;
+    str := strconv.itoa(buf[:], cast(int)game_state.current_figure.bpm);
+	if int(game_state.current_figure.bpm) != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
+		for len(bpm_text) > 1{
+			log.info(bpm_text)
+			char_count -= 1
+			if char_count < 0 {
+				char_count = 0
+			}else{
+				pop(&bpm_text) // quitar char
+				bpm_text[char_count] = 0 // null terminator
+			}
+		}
+
+		for c in str{
+			append(&bpm_text, 0)               // null terminator
+			bpm_text[char_count] = u8(c)          // añadir char
+			char_count += 1
+		}
+	}
 	{
-		char_count := 0
-		mouse_on_text := false
-		text_box := rect { current_x, current_y, 50, UI_LINE_HEIGHT }
 		if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
 			append(&bpm_text, 0)
 		}
 
-		if (rl.CheckCollisionPointRec(rl.GetMousePosition(), text_box)) {
+		if (rl.CheckCollisionPointRec(rl.GetMousePosition(), textBox)) {
 			rl.SetMouseCursor(rl.MouseCursor.IBEAM)
 			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
 				mouse_on_text = true
@@ -285,11 +312,12 @@ render_figure_ui :: proc() {
 				}
 			}
 		}
+		log.info(mouse_on_text)
 
 		if mouse_on_text {
 			value := rl.GetCharPressed()
 			for value > 0 {
-				if (value >= '0') && (value <= '9') && (char_count < 2) {
+				if (value >= '0') && (value <= '9') && (char_count < 3) {
 					append(&bpm_text, 0)               // null terminator
 					bpm_text[char_count] = u8(value)          // store character
 					char_count += 1
@@ -308,13 +336,14 @@ render_figure_ui :: proc() {
 			}
 		}
 		
-		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "BPM:")
-
-		text_box = rect { current_x, current_y, 50, UI_LINE_HEIGHT }
-		rl.DrawRectangleRec(text_box, rl.DARKGRAY)
-		current_x += 120 + UI_PADDING
-
-		rl.DrawText(cast(cstring) &bpm_text[0], i32(current_x), i32(current_y), 5, rl.WHITE)
+		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Bpm:")
+		current_x += 100 + UI_PADDING
+		rl.DrawRectangleRec(textBox, rl.DARKGRAY)
+		textBox = rl.Rectangle({current_x, current_y+8, 50, UI_LINE_HEIGHT - 15 })
+		current_x += UI_PADDING
+		rl.DrawText(cast(cstring) &bpm_text[0], i32(current_x), i32(current_y)+10, 5, rl.WHITE)
+		ok:=false
+		game_state.current_figure.bpm, ok = strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
 	}
 
 	current_x = UI_figure_panel_dim.x + UI_PADDING
