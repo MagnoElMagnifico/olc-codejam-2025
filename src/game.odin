@@ -115,7 +115,7 @@ update :: proc() {
 		game_state.state = .View
 	}
 
-	if rl.IsKeyPressed(.BACKSPACE) || rl.IsKeyPressed(.DELETE) {
+	if rl.IsKeyPressed(.BACKSPACE) && check_backspace_action() == 1 || rl.IsKeyPressed(.DELETE) {
 		if game_state.current_figure != nil do delete_current_figure()
 		else if game_state.state == .Multiselection do delete_multiselected_figures()
 	}

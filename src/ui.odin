@@ -269,7 +269,6 @@ render_figure_ui :: proc() {
     str := strconv.itoa(buf[:], cast(int)game_state.current_figure.bpm);
 	if int(game_state.current_figure.bpm) != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
 		for len(bpm_text) > 1{
-			log.info(bpm_text)
 			char_count -= 1
 			if char_count < 0 {
 				char_count = 0
@@ -312,8 +311,6 @@ render_figure_ui :: proc() {
 				}
 			}
 		}
-		log.info(mouse_on_text)
-
 		if mouse_on_text {
 			value := rl.GetCharPressed()
 			for value > 0 {
@@ -424,4 +421,12 @@ render_debug_info :: proc() {
 		UI_FONT_SIZE,
 		rl.WHITE
 	)
+}
+
+check_backspace_action :: proc() -> int{
+	if mouse_on_text {
+		return 0
+	}else{
+		return 1
+	}
 }
