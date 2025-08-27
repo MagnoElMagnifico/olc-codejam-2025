@@ -15,6 +15,20 @@ Run the specific files for your platform:
 - Linux Desktop: `build_desktop.sh`
 - Linux Web: `build_web.sh`
 
+# How to use
+
+Controls:
+
+-   Left click and drag to create new figures. You can use the UI on the left to
+    configure what properties they will have.
+-   Left click on the circle on the center of the figure to select it. With the
+    UI on the right, you will be able to modify its properties: point speed,
+    music notes, the counter, number of sides of the figure, etc.
+-   Holding `Shift`, you can select more, or use right click and drag to select
+    figures in a rectangular fashion.
+-   Use `Delete` or `Backspace` to delete the figures currently selected.
+-   Left click elsewhere or press `Esc` to cancel the current selection.
+
 # Useful links
 
 - [Odin Overview](https://odin-lang.org/docs/overview/)
