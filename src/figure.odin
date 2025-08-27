@@ -5,14 +5,16 @@ import m "core:math/linalg"
 
 import "core:c"
 import "core:mem"
+import "core:log"
 
-FIGURE_SELECTOR_SIZE       :: 20
-FIGURE_MIN_RADIUS_SELECTOR :: 20
-FIGURE_MIN_RADIUS          :: 3.0
-FIGURE_POINT_RADIUS        :: 5.0
-FIGURE_SELECTED_COLOR      :: rl.RED
-FIGURE_BEAT_COLOR          :: rl.SKYBLUE
-FIGURE_FIRST_POINT_COLOR   :: rl.GREEN
+FIGURE_MAX_SIDES     :: 25
+FIGURE_POINT_RADIUS  :: 5.0
+FIGURE_MIN_RADIUS    :: 35
+FIGURE_SELECTOR_SIZE :: 20
+
+FIGURE_BEAT_COLOR        :: rl.SKYBLUE
+FIGURE_FIRST_POINT_COLOR :: rl.GREEN
+FIGURE_SELECTED_COLOR    :: rl.RED
 
 Selection_State :: enum {
 	View = 0,
@@ -34,30 +36,14 @@ Regular_Figure :: struct {
 	point_progress: f32,
 	// Indica el número de ciclos que le queda a la figura (infinito es -1)
 	point_counter: int,
+	// Indica el contador inicial de la figura (para saber a qué valor resetear)
 	point_counter_start: int,
 
-	notes: [25]Music_Notes,
-}
-
-//TODO: Pulsar el botón delete hace crashear el juego
-delete_current_figure :: proc() {
-	using game_state
-	assert(
-		current_figure != nil && (state == .Edit_Figure ||
-		state == .Selected_Figure ||
-		state == .Move_Figure),
-		"para borrar una figura, esta debe estar seleccionada"
-	)
-
-	// Mueve el último elemento al actual y reduce la longitud
-	index := mem.ptr_sub(current_figure, &figures[0])
-	unordered_remove(&figures, index)
-
-	state = .View
-	current_figure = nil
+	notes: [FIGURE_MAX_SIDES]Music_Notes,
 }
 
 // WARN: Solo poner código relacionado con el ratón, no eventos de teclado
+// WARN: Los chequeos de colisiones con el ratón se deben hacer en screen space
 update_figure_mouse_input :: proc() {
 	using game_state
 
@@ -74,19 +60,13 @@ update_figure_mouse_input :: proc() {
 	case .View: {
 		assert(current_figure == nil, "En modo .View, current_figure debe ser nil")
 
-		if rl.IsMouseButtonPressed(.LEFT) {
+		if rl.IsMouseButtonPressed(.LEFT) || rl.IsMouseButtonDown(.LEFT) {
 			// Comprobar si se seleccionan figuras
-			mouse_world := to_world(camera, rl.GetMousePosition())
-			for &fig in figures {
-				// Esta comprobación es rápida, por eso usamos círculos
-				if rl.CheckCollisionPointCircle(mouse_world, fig.center, FIGURE_SELECTOR_SIZE) {
-					current_figure = &fig
-					break
-				}
-			}
+			selected := select_figure()
 			
-			if current_figure != nil {
+			if selected != nil {
 				// Seleccionar figura
+				current_figure = selected
 				state = .Selected_Figure
 
 			} else {
@@ -118,13 +98,15 @@ update_figure_mouse_input :: proc() {
 			// TODO: para que sean números enteros, aquí hay que hacer
 			// cálculos para que coincida bien
 			current_figure.radius = to_world(camera, rl.GetMousePosition())
-		} else if m.vector_length(current_figure.center - current_figure.radius) < FIGURE_MIN_RADIUS {
+
+		} else if !is_figure_big_enough(current_figure^) {
 			// Si la figura es muy pequeña, salir
 			// NOTE: se puede venir aquí si se selecciona una existente y se
 			// cambia de tamaño, por lo que esto puede que no lo queramos
+			delete_current_figure()
 			current_figure = nil
 			state = .View
-			pop(&figures)
+
 		} else {
 			state = .Selected_Figure
 		}
@@ -135,39 +117,33 @@ update_figure_mouse_input :: proc() {
 
 		if rl.IsMouseButtonPressed(.LEFT) {
 			// Comprobar si seleccionamos algo
-			mouse_world := to_world(camera, rl.GetMousePosition())
+			mouse := rl.GetMousePosition()
 
-			if rl.CheckCollisionPointCircle(mouse_world, current_figure.center, FIGURE_SELECTOR_SIZE) {
-				// Arrastrar la figura
-				state = .Move_Figure
-
-			} else if rl.CheckCollisionPointCircle(mouse_world, current_figure.radius, FIGURE_POINT_RADIUS) {
+			if rl.CheckCollisionPointCircle(mouse, to_screen(camera, current_figure.radius), FIGURE_POINT_RADIUS) {
 				// Click en el vértice para cambiar su tamaño
 				state = .Edit_Figure
 
-			} else if collision, segment, progress := check_collision_figure(mouse_world, current_figure^); collision {
+			} else if is_figure_selected(mouse, current_figure^) {
+				// Arrastrar la figura
+				state = .Move_Figure
+
+			} else if collision, segment, progress := check_collision_figure(mouse, current_figure^); collision {
 				// Cambiar la posición del punto actual
 				current_figure.point_seg_index = segment
 				current_figure.point_progress = progress
 
 			} else {
 				// Sino, mirar si se ha seleccionado otra figura
-				new_selected_figure: ^Regular_Figure
-				for &fig in figures {
-					// Esta comprobación es rápida, por eso usamos círculos
-					if rl.CheckCollisionPointCircle(mouse_world, fig.center, FIGURE_SELECTOR_SIZE) {
-						new_selected_figure = &fig
-					}
-				}
+				selected := select_figure()
 
-				if new_selected_figure == nil {
+				if selected == nil {
 					// Deseleccionar si se hace click en otro lado
 					current_figure = nil
 					state = .View
 				} else {
-					assert(new_selected_figure != current_figure)
+					assert(selected != current_figure, "unreachable: se manejó este caso en otra rama")
 					// Seleccionar otra figura
-					current_figure = new_selected_figure
+					current_figure = selected
 				}
 			}
 		}
@@ -218,7 +194,7 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 	//     "tamaño de lado" (px) / "tiempo de frame" (seg) = velocidad
 	//
 	// TODO: Leer https://www.gamedeveloper.com/audio/coding-to-the-beat---under-the-hood-of-a-rhythm-game-in-unity
-	fig.point_progress += rl.GetFrameTime()*f32(fig.bpm/60)
+	fig.point_progress += rl.GetFrameTime() * f32(fig.bpm) / 60
 
 	// Cambiar de vértice
 	if fig.point_progress > 1.0 {
@@ -271,7 +247,7 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 		)
 	}
 
-	if screen_radius > FIGURE_MIN_RADIUS_SELECTOR {
+	if screen_radius > FIGURE_MIN_RADIUS {
 		// Dibujar el "handle" que permite seleccionar y mover la figura
 		c_screen_center := iv2 {c.int(screen_center.x), c.int(screen_center.y)}
 		rl.DrawCircleLines(c_screen_center.x, c_screen_center.y, FIGURE_SELECTOR_SIZE, color)
@@ -312,53 +288,6 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 
 		rl.DrawCircle(c.int(beat_point.x), c.int(beat_point.y), FIGURE_POINT_RADIUS, point_color)
 	}
-}
-
-@(private="file")
-check_collision_figure :: proc(pos: v2, fig: Regular_Figure) -> (collision: bool, segment: uint, progress: f32) {
-	diff := fig.center - fig.radius
-
-	vertex1 := fig.radius
-	vertex2: v2
-	for i in 1 ..< fig.n {
-		angle := 2 * m.PI * f32(i) / f32(fig.n)
-
-		vertex2.x = fig.center.x - (diff.x * m.cos(angle) - diff.y * m.sin(angle))
-		vertex2.y = fig.center.y - (diff.x * m.sin(angle) + diff.y * m.cos(angle))
-
-		if rl.CheckCollisionCircleLine(pos, FIGURE_SELECTOR_SIZE, vertex1, vertex2) {
-			collision = true
-			segment = i - 1
-			break
-		}
-
-		vertex1 = vertex2
-	}
-
-	// El último segmento se hace con primer vértice
-	if !collision && rl.CheckCollisionCircleLine(pos, FIGURE_SELECTOR_SIZE, vertex1, fig.radius) {
-		vertex2 = fig.radius
-		collision = true
-		segment = fig.n - 1
-	}
-
-	if !collision {
-		return
-	}
-
-	// https://ericleong.me/research/circle-line/ (modificado)
-	cx: f32
-	v   := vertex2 - vertex1
-	c1  := v.y * vertex1.x - v.x * vertex1.y
-	c2  := v.y * pos.y + v.x * pos.x
-	det := v.y * v.y + v.x * v.x
-	if det != 0 {
-		cx = (v.y * c1 + v.x * c2) / det
-		// (cx, cy) = vertex1 + k * v => despejar k
-		progress = (cx - vertex1.x) / v.x
-	}
-
-	return
 }
 
 render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color := FIGURE_BEAT_COLOR) {
@@ -421,3 +350,103 @@ render_selected_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 	}
 }
 
+// ==== UTIL FUNCTIONS ========================================================
+
+delete_current_figure :: proc() {
+	using game_state
+	assert(
+		current_figure != nil && (state == .Edit_Figure ||
+		state == .Selected_Figure ||
+		state == .Move_Figure),
+		"para borrar una figura, esta debe estar seleccionada"
+	)
+
+	// Mueve el último elemento al actual y reduce la longitud
+	index := mem.ptr_sub(current_figure, &figures[0])
+	unordered_remove(&figures, index)
+
+	state = .View
+	current_figure = nil
+}
+
+@(private="file")
+check_collision_figure :: proc(pos: v2, fig: Regular_Figure) -> (collision: bool, segment: uint, progress: f32) {
+	diff := fig.center - fig.radius
+
+	pos_world := to_world(game_state.camera, pos)
+
+	vertex1 := fig.radius
+	vertex2: v2
+	for i in 1 ..< fig.n {
+		angle := 2 * m.PI * f32(i) / f32(fig.n)
+
+		vertex2.x = fig.center.x - (diff.x * m.cos(angle) - diff.y * m.sin(angle))
+		vertex2.y = fig.center.y - (diff.x * m.sin(angle) + diff.y * m.cos(angle))
+
+		if rl.CheckCollisionCircleLine(pos, FIGURE_SELECTOR_SIZE, to_screen(game_state.camera, vertex1), to_screen(game_state.camera, vertex2)) {
+			collision = true
+			segment = i - 1
+			break
+		}
+
+		vertex1 = vertex2
+	}
+
+	// El último segmento se hace con primer vértice
+	if !collision && rl.CheckCollisionCircleLine(pos, FIGURE_SELECTOR_SIZE, to_screen(game_state.camera, vertex1), to_screen(game_state.camera, fig.radius)) {
+		vertex2 = fig.radius
+		collision = true
+		segment = fig.n - 1
+	}
+
+	if !collision {
+		return
+	}
+
+	// https://ericleong.me/research/circle-line/ (modificado)
+	cx: f32
+	v   := vertex2 - vertex1
+	c1  := v.y * vertex1.x - v.x * vertex1.y
+	c2  := v.y * pos_world.y + v.x * pos_world.x
+	det := v.y * v.y + v.x * v.x
+	if det != 0 {
+		cx = (v.y * c1 + v.x * c2) / det
+		// (cx, cy) = vertex1 + k * v => despejar k
+		progress = (cx - vertex1.x) / v.x
+	}
+
+	return
+}
+
+@(private="file")
+is_figure_selected :: #force_inline proc "contextless" (mouse: v2, fig: Regular_Figure) -> bool {
+	// Hacerlo todo al cuadrado para no calcular sqrt()
+	screen_center := to_screen(game_state.camera, fig.center)
+
+	return is_figure_big_enough(fig) &&
+		rl.CheckCollisionPointCircle(mouse, screen_center, FIGURE_SELECTOR_SIZE)
+}
+
+@(private="file")
+select_figure :: proc() -> (selected: ^Regular_Figure) {
+	using game_state
+
+	mouse := rl.GetMousePosition()
+	for &fig in figures {
+		if is_figure_selected(mouse, fig) {
+			selected = &fig
+			break
+		}
+	}
+
+	return
+}
+
+// Comprueba si la longitud del vector dado en world space cabe dentro de la
+// distancia d en screen space
+@(private="file")
+is_figure_big_enough :: #force_inline proc "contextless" (fig: Regular_Figure) -> bool {
+	screen_center := to_screen(game_state.camera, fig.center)
+	screen_radius := to_screen(game_state.camera, fig.radius)
+	return m.vector_length2(screen_center - screen_radius) > FIGURE_MIN_RADIUS * FIGURE_MIN_RADIUS
+}

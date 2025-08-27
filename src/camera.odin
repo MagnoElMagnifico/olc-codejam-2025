@@ -22,7 +22,7 @@ Camera :: struct {
 // Convierte un vector con coordenadas del mundo a coordenadas de pantalla
 // Usar siempre antes de dibujar algo en la pantalla para que la camara funcione
 // correctamente.
-to_screen :: proc(camera: Camera, v: v2) -> v2 {
+to_screen :: #force_inline proc "contextless" (camera: Camera, v: v2) -> v2 {
 	// El centro del zoom será el centro de la pantalla
 	focus := v2 { f32(game_state.window_size.x) / 2, f32(game_state.window_size.y) / 2 }
 
@@ -36,7 +36,7 @@ to_screen :: proc(camera: Camera, v: v2) -> v2 {
 
 // Convierte un vector con coordenadas la pantalla (posición del ratón) a
 // coordenadas de mundo
-to_world :: proc(camera: Camera, v: v2) -> v2 {
+to_world :: #force_inline proc "contextless" (camera: Camera, v: v2) -> v2 {
 	focus := v2 { f32(game_state.window_size.x) / 2, f32(game_state.window_size.y) / 2 }
 	// v = z * pan - focus * (z - 1)
 	// v / z = pan - focus * (z - 1) / z

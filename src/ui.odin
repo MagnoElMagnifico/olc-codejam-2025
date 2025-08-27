@@ -8,39 +8,25 @@ import "core:log"
 import "core:strconv"
 import "core:strings"
 
-MAX_SIDES :: 25
-
-UI_PADDING     :: 5
+UI_FONT_SIZE   :: 12
 UI_LINE_HEIGHT :: 30
 UI_MARGIN      :: 15
-
-UI_Y_POS       :: UI_MARGIN + UI_LINE_HEIGHT
-UI_FONT_SIZE   :: 12
+UI_PADDING     :: 5
 UI_BUTTON_SIZE :: UI_LINE_HEIGHT - UI_PADDING
-bpm_text : [dynamic]u8
-
-UI_figure_height : uint //en unidades de 1 se cambiará. Tamaño variará según el número de notas a configurar
 
 // Tamaño del panel UI para dar a raylib
-// TODO: mismo ancho en estos tamaños para que todo vaya alineado?
 UI_PANEL_DIM :: rect {
 	UI_MARGIN, UI_MARGIN,
 	/* MAX ANCHO: text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40,
 	/* ALTO: cabecera + 4 filas + padding final */ 5 * UI_LINE_HEIGHT + UI_PADDING,
 }
 
-// Tamaño del panel UI para dar a raylib
-UI_REAL_PANEL_DIM :: rect {
-	UI_MARGIN,
-	UI_MARGIN,
-	/* text: */ 100 + /* 3 botones: */ 3*UI_LINE_HEIGHT + 3*UI_PADDING,
-	4 * UI_LINE_HEIGHT + UI_PADDING
-}
-
+// TODO: mover a game_state
+bpm_text : [dynamic]u8
 UI_figure_panel_dim := rect {
-	0,
-	UI_MARGIN,
-	150 + 3*UI_LINE_HEIGHT + 3*UI_PADDING,
+	0, UI_MARGIN,
+	// 150 + 3*UI_LINE_HEIGHT + 3*UI_PADDING,
+	/* MAX ANCHO: text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40,
 	150,
 }
 
@@ -79,7 +65,7 @@ render_create_figure_ui :: proc() {
 		current_x += 100 + UI_PADDING
 
 		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
-			n_sides = min(n_sides + 1, MAX_SIDES)
+			n_sides = min(n_sides + 1, FIGURE_MAX_SIDES)
 		}
 		current_x += UI_LINE_HEIGHT + UI_PADDING
 
@@ -163,20 +149,18 @@ render_create_figure_ui :: proc() {
 }
 
 render_figure_ui :: proc() {
-
 	if game_state.state == .View {
 		return
 	}
 
+	UI_figure_panel_dim.x = f32(game_state.window_size.x) - UI_figure_panel_dim.width - UI_MARGIN
 	rl.GuiPanel(UI_figure_panel_dim, "Figure Options")
-	UI_figure_panel_dim.x = f32(game_state.window_size.x)-(UI_MARGIN+150 + 4*UI_LINE_HEIGHT + 3*UI_PADDING)
+
 	current_x : f32 = UI_figure_panel_dim.x + UI_PADDING
-	// f32(rl.GetScreenWidth())-UI_PADDING - UI_MARGIN - 300
 	current_y : f32 = UI_figure_panel_dim.y + UI_LINE_HEIGHT
 
 	using game_state.current_figure
 
-	// TODO: UI para las notas
 	// Número de lados de la figura
 	{
 		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Sides:")
@@ -184,7 +168,7 @@ render_figure_ui :: proc() {
 		current_x += 100 + UI_PADDING
 
 		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
-			n = min(n + 1, MAX_SIDES)
+			n = min(n + 1, FIGURE_MAX_SIDES)
 		}
 		current_x += UI_LINE_HEIGHT + UI_PADDING
 
@@ -221,29 +205,17 @@ render_figure_ui :: proc() {
 	current_x = UI_figure_panel_dim.x + UI_PADDING
 	current_y += UI_LINE_HEIGHT
 
-	// Borrar figura
+	// Especificar las notas
 	{
-		rl.GuiLabel({current_x, current_y, 80, UI_LINE_HEIGHT}, "Delete")
-		current_x += 100 + UI_PADDING
-
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, 60, UI_BUTTON_SIZE}, "X") {
-			delete_current_figure()
-		}
-	}
-		
-	current_x = UI_figure_panel_dim.x + UI_PADDING
-	current_y += UI_LINE_HEIGHT
-	
-	//Adición de las notas
-	{	
-		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Sound Config:")
+		rl.GuiLabel({current_x, current_y, 100, UI_LINE_HEIGHT}, "Sound Config:")
 		current_x = UI_figure_panel_dim.x + UI_PADDING
 		current_y += UI_LINE_HEIGHT
 
-		n:uint = 0
+		n: uint = 0
 
 		for note in 1..=game_state.current_figure.n {
-			rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Vertice")
+			// TODO: usar caprintf("Vertex %d\x00", n+1)? Así queda el texto más junto
+			rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Vertex")
 			rl.GuiLabel({current_x + 50, current_y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(n+1)))
 			current_x += 100 + UI_PADDING
 
@@ -271,30 +243,29 @@ render_figure_ui :: proc() {
 		}
 	}
 	
-	
-	//BPM config
-	char_count := 0
-	mouse_on_text := false
-	textBox := rl.Rectangle({current_x, current_y, 50, UI_LINE_HEIGHT })
-	if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
-		append(&bpm_text,0)
-	}
-
+	// BPM config
 	{
-		if (rl.CheckCollisionPointRec(rl.GetMousePosition(), textBox)) {
+		char_count := 0
+		mouse_on_text := false
+		text_box := rect { current_x, current_y, 50, UI_LINE_HEIGHT }
+		if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
+			append(&bpm_text, 0)
+		}
+
+		if (rl.CheckCollisionPointRec(rl.GetMousePosition(), text_box)) {
 			rl.SetMouseCursor(rl.MouseCursor.IBEAM)
 			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
 				mouse_on_text = true
 			}
-		}else{
+		} else {
 			rl.SetMouseCursor(rl.MouseCursor.DEFAULT)
 			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
 				mouse_on_text = false
-				if strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))) < 1{
+				if strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))) < 1 {
 					char_count -= 1
 					if char_count < 0 {
 						char_count = 0
-					}else{
+					} else {
 						pop(&bpm_text) // quitar valor < 1
 					}
 					append(&bpm_text, 0) // null terminator
@@ -307,7 +278,7 @@ render_figure_ui :: proc() {
 		if mouse_on_text {
 			value := rl.GetCharPressed()
 			for value > 0 {
-				if (value >= 48) && (value <= 57) && (char_count < 2) {
+				if (value >= '0') && (value <= '9') && (char_count < 2) {
 					append(&bpm_text, 0)               // null terminator
 					bpm_text[char_count] = u8(value)          // store character
 					char_count += 1
@@ -315,29 +286,43 @@ render_figure_ui :: proc() {
 				value = rl.GetCharPressed()
 			}
 
-			if rl.IsKeyPressed(rl.KeyboardKey.BACKSPACE) {
+			if rl.IsKeyPressed(.BACKSPACE) {
 				char_count -= 1
 				if char_count < 0 {
 					char_count = 0
-				}else{
+				} else {
 					pop(&bpm_text) // remove character
 					bpm_text[char_count] = 0 // null terminator
 				}
 			}
 		}
 		
-		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Bpm:")
-		textBox = rl.Rectangle({current_x, current_y, 50, UI_LINE_HEIGHT })
-		rl.DrawRectangleRec(textBox, rl.DARKGRAY)
+		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "BPM:")
+
+		text_box = rect { current_x, current_y, 50, UI_LINE_HEIGHT }
+		rl.DrawRectangleRec(text_box, rl.DARKGRAY)
 		current_x += 120 + UI_PADDING
+
 		rl.DrawText(cast(cstring) &bpm_text[0], i32(current_x), i32(current_y), 5, rl.WHITE)
 	}
-	log.info(bpm_text)
 
 	current_x = UI_figure_panel_dim.x + UI_PADDING
 	current_y += UI_LINE_HEIGHT
 
+	// Borrar figura
+	// WARN: debe estar al final de la función: si se borra la figura y el
+	// código siguiente usa game_state.current_figure, habrá un crash
+	{
+		rl.GuiLabel({current_x, current_y, 80, UI_LINE_HEIGHT}, "Delete")
+		current_x += 100 + UI_PADDING
 
+		if rl.GuiButton({current_x, current_y+UI_PADDING/2, 60, UI_BUTTON_SIZE}, "X") {
+			delete_current_figure()
+		}
+	}
+
+	current_x = UI_figure_panel_dim.x + UI_PADDING
+	current_y += UI_LINE_HEIGHT
 	UI_figure_panel_dim.height = current_y
 }
 

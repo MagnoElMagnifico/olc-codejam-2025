@@ -18,6 +18,7 @@ WINDOW_SIZE :: iv2 {1280, 720}
 
 Music_Notes :: enum u8 {
 	// TODO: Añadir más notas?
+	// TODO: hacer Null = 0 para que sea la nota por defecto?
 	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep, Null
 }
 
@@ -34,8 +35,6 @@ STRING_NOTES := [Music_Notes]cstring {
 	.Rep = "Rep",
 	.Null = "---"
 }
-
-
 
 // ==== GAME DATA =============================================================
 
@@ -140,10 +139,12 @@ update :: proc() {
 	}
 
 	// Render UI: debe ejecutarse después de las figuras para que se muestre por
-	// encima.
+	// encima. Esto puede ser molesto porque el frame ya se ha dibujado,
+	// entonces el input de la UI se procesará para el siguiente frame.
 	render_create_figure_ui()
 	render_debug_info()
 
+	// Borrar memoria temporal
 	free_all(context.temp_allocator)
 }
 
