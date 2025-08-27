@@ -5,6 +5,8 @@ import rl "vendor:raylib"
 import "core:c"
 import "core:fmt"
 import "core:log"
+import "core:strconv"
+import "core:strings"
 
 MAX_SIDES :: 25
 
@@ -15,6 +17,7 @@ UI_MARGIN      :: 15
 UI_Y_POS       :: UI_MARGIN + UI_LINE_HEIGHT
 UI_FONT_SIZE   :: 12
 UI_BUTTON_SIZE :: UI_LINE_HEIGHT - UI_PADDING
+bpm_text : [dynamic]u8
 
 UI_figure_height : uint //en unidades de 1 se cambiará. Tamaño variará según el número de notas a configurar
 
@@ -186,7 +189,7 @@ render_figure_ui :: proc() {
 		current_x += UI_LINE_HEIGHT + UI_PADDING
 
 		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
-			n = max(n - 1, 3)
+			n = max(n - 1, 2)
 		}
 		current_x += UI_LINE_HEIGHT + UI_PADDING
 	}
@@ -267,6 +270,74 @@ render_figure_ui :: proc() {
 			n += 1
 		}
 	}
+	
+	
+	//BPM config
+	char_count := 0
+	mouse_on_text := false
+	textBox := rl.Rectangle({current_x, current_y, 50, UI_LINE_HEIGHT })
+	if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
+		append(&bpm_text,0)
+	}
+
+	{
+		if (rl.CheckCollisionPointRec(rl.GetMousePosition(), textBox)) {
+			rl.SetMouseCursor(rl.MouseCursor.IBEAM)
+			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+				mouse_on_text = true
+			}
+		}else{
+			rl.SetMouseCursor(rl.MouseCursor.DEFAULT)
+			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+				mouse_on_text = false
+				if strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))) < 1{
+					char_count -= 1
+					if char_count < 0 {
+						char_count = 0
+					}else{
+						pop(&bpm_text) // quitar valor < 1
+					}
+					append(&bpm_text, 0) // null terminator
+					bpm_text[char_count] = 49 //añadir el 1
+					char_count += 1
+				}
+			}
+		}
+
+		if mouse_on_text {
+			value := rl.GetCharPressed()
+			for value > 0 {
+				if (value >= 48) && (value <= 57) && (char_count < 2) {
+					append(&bpm_text, 0)               // null terminator
+					bpm_text[char_count] = u8(value)          // store character
+					char_count += 1
+				}
+				value = rl.GetCharPressed()
+			}
+
+			if rl.IsKeyPressed(rl.KeyboardKey.BACKSPACE) {
+				char_count -= 1
+				if char_count < 0 {
+					char_count = 0
+				}else{
+					pop(&bpm_text) // remove character
+					bpm_text[char_count] = 0 // null terminator
+				}
+			}
+		}
+		
+		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Bpm:")
+		textBox = rl.Rectangle({current_x, current_y, 50, UI_LINE_HEIGHT })
+		rl.DrawRectangleRec(textBox, rl.DARKGRAY)
+		current_x += 120 + UI_PADDING
+		rl.DrawText(cast(cstring) &bpm_text[0], i32(current_x), i32(current_y), 5, rl.WHITE)
+	}
+	log.info(bpm_text)
+
+	current_x = UI_figure_panel_dim.x + UI_PADDING
+	current_y += UI_LINE_HEIGHT
+
+
 	UI_figure_panel_dim.height = current_y
 }
 

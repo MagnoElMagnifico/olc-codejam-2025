@@ -26,6 +26,7 @@ Regular_Figure :: struct {
 	center: v2,
 	radius: v2,
 	n: uint,
+	bpm: uint,
 
 	// Indica en qué segmento está el punto: [0, n-1]
 	point_seg_index: uint,
@@ -102,6 +103,7 @@ update_figure_mouse_input :: proc() {
 					point_progress = 0,
 					point_counter_start = create_figure_ui.counter,
 					point_counter = create_figure_ui.counter,
+					bpm = 60
 				})
 
 				current_figure = &figures[len(figures)-1]
@@ -216,7 +218,7 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 	//     "tamaño de lado" (px) / "tiempo de frame" (seg) = velocidad
 	//
 	// TODO: Leer https://www.gamedeveloper.com/audio/coding-to-the-beat---under-the-hood-of-a-rhythm-game-in-unity
-	fig.point_progress += rl.GetFrameTime()
+	fig.point_progress += rl.GetFrameTime()*f32(fig.bpm/60)
 
 	// Cambiar de vértice
 	if fig.point_progress > 1.0 {
