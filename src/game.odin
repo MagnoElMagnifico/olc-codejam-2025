@@ -211,6 +211,10 @@ update :: proc() {
 
 		case .Link:
 			update_figure_link_tool()
+
+			if rl.IsKeyPressed(.ESCAPE) {
+				game_state.current_figure = nil
+			}
 		}
 	}
 
@@ -281,6 +285,7 @@ update :: proc() {
 	}
 
 	render_toolbox_ui()
+	render_error_msg()
 
 	when ODIN_DEBUG {
 		render_debug_info()

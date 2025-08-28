@@ -15,6 +15,9 @@ UI_MARGIN      :: 15
 UI_PADDING     :: 5
 UI_BUTTON_SIZE :: UI_LINE_HEIGHT - UI_PADDING
 
+UI_ERROR_MSG_TIME  :: 5.0 // s
+UI_ERROR_MSG_COLOR :: rl.RED
+
 // Tamaño del panel UI para dar a raylib
 UI_PANEL_DIM :: rect {
 	UI_MARGIN, UI_MARGIN,
@@ -46,6 +49,9 @@ UI_toolbox_ui := rect {
 	3 * UI_BUTTON_SIZE + 4 * UI_PADDING,
 	UI_LINE_HEIGHT,
 }
+
+error_message: cstring
+error_message_count_down: f32
 
 render_toolbox_ui :: proc() {
 	UI_toolbox_ui.x = f32(game_state.window_size.x) / 2 - UI_toolbox_ui.width / 2
@@ -421,6 +427,21 @@ render_figure_ui :: proc() {
 	current_y += UI_LINE_HEIGHT
 	// TODO: no queda con el tamaño correcto, es un poco más grande
 	UI_figure_panel_dim.height = current_y
+}
+
+set_error_msg :: proc(s: cstring) {
+	error_message = s
+	error_message_count_down = UI_ERROR_MSG_TIME
+}
+
+render_error_msg :: proc() {
+	if error_message_count_down <= 0 do return
+
+	error_message_count_down -= rl.GetFrameTime()
+	width := rl.MeasureText(error_message, UI_FONT_SIZE)
+	pos_x := game_state.window_size.x - UI_MARGIN - width
+	pos_y := game_state.window_size.y - UI_MARGIN - UI_FONT_SIZE
+	rl.DrawText(error_message, pos_x, pos_y, UI_FONT_SIZE, UI_ERROR_MSG_COLOR)
 }
 
 render_debug_info :: proc() {

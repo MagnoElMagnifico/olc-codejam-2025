@@ -311,6 +311,7 @@ update_figure_selection_tool :: proc() {
 }
 
 update_figure_link_tool :: proc() {
+	using game_state
 	// Esta herramienta solo funciona al hacer click
 	if !rl.IsMouseButtonPressed(.LEFT) {
 		return
@@ -318,41 +319,65 @@ update_figure_link_tool :: proc() {
 
 	selected := select_figure()
 
+	// ==== Primer paso: seleccionar una figura ====
+
 	// Si se hizo click en otro lado, cancelar la selección
 	if select_figure == nil {
-		game_state.current_figure = nil
+		current_figure = nil
 		return
 	}
 
 	// Almacenar figura seleccionada para crear el siguiente link
-	if game_state.current_figure == nil {
-		game_state.current_figure = selected
+	if current_figure == nil {
+		current_figure = selected
 		return
 	}
 
+	// ==== Segundo paso: seleccionar otra figura ====
+
 	// Borrar el link si se hace consigo misma
-	if selected == game_state.current_figure {
+	if selected == current_figure {
 		// Borrar el link con la siguiente figura
-		next := game_state.current_figure.next_figure
+		next := current_figure.next_figure
 		if next == nil do return
-		game_state.current_figure.next_figure = nil
+		current_figure.next_figure = nil
 
 		// Borrar el backlink anterior
 		next.previous_figure = nil
 
 		// Y cancelar la selección
-		game_state.current_figure = nil
+		current_figure = nil
 		return
 	}
 
+	// Si el enlace es el mismo, no hacer nada
+	if current_figure.next_figure == selected {
+		current_figure = nil
+		return
+	}
+
+	// No permitir que dos figuras apunten a una misma figura: se
+	// sobreescribiría el puntero `previous_figure`
+	// TODO: permitir? Entonces previous_figure: [dynamic]^Regular_Figure
+	if selected.previous_figure != nil {
+		set_error_msg("The figure is already linked")
+		current_figure = nil
+		return
+	}
+
+	// Borrar el backlink de la figura que estaba antes enlazada
+	if current_figure.next_figure != nil {
+		current_figure.next_figure.previous_figure = nil
+	}
+
 	// Crear el enlace con la nueva figura
-	game_state.current_figure.next_figure = selected
+	current_figure.next_figure = selected
 
 	// Crear el backlink
-	selected.previous_figure = game_state.current_figure
+	selected.previous_figure = current_figure
 
 	// Y cancelar la selección
-	game_state.current_figure = nil
+	current_figure = nil
 }
 
 // ==== STATE UPDATE ==========================================================
@@ -542,6 +567,8 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 	}
 }
 
+// TODO: Usar el color que tiene la figura en la estructura, no el que se le
+// pasa por parámetro
 render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color := FIGURE_BEAT_COLOR, fade := true) {
 	using game_state
 
@@ -550,8 +577,10 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color 
 	color := color
 	point_color := point_color
 
-	// Cambiar los colores en función del contador
-	if fade && fig.point_counter == 0 {
+	// Cambiar los colores si el contador llegó a 0 o si la figura anterior
+	// tiene INF
+	if fade && (fig.point_counter == 0 || (fig.previous_figure != nil && fig.previous_figure.point_counter == -1)) {
+		// TODO: con los colores aleatorios no se entiende que esto sea un fade
 		color = {
 			u8(f32(color.r) * 0.6),
 			u8(f32(color.b) * 0.6),
@@ -644,16 +673,18 @@ delete_current_figure :: proc() {
 	index := mem.ptr_sub(current_figure, &figures[0])
 	unordered_remove(&figures, index)
 
-	// Gestionar caso 3: ahora current_figure apunta al elemento que estaba al
-	// final. Debemos poner el puntero de la figura que lo apuntaba a la nueva
-	// posición
-	if current_figure.previous_figure != nil {
-		current_figure.previous_figure.next_figure = current_figure
-	}
+	// Gestionar caso 3: solo aplica si el elemento borrado no es el último
+	if index != len(figures) {
+		// Ahora current_figure apunta al elemento que estaba al final. Debemos
+		// poner el puntero de la figura que lo apuntaba a la nueva posición
+		if current_figure.previous_figure != nil {
+			current_figure.previous_figure.next_figure = current_figure
+		}
 
-	// Lo mismo pero para el backlink
-	if current_figure.next_figure != nil {
-		current_figure.next_figure.previous_figure = current_figure
+		// Lo mismo pero para el backlink
+		if current_figure.next_figure != nil {
+			current_figure.next_figure.previous_figure = current_figure
+		}
 	}
 
 	state = .View
@@ -692,23 +723,18 @@ delete_multiselected_figures :: proc() {
 	for i in 0 ..< len(selected_figures) {
 		// No romper los links: ver explicación en `delete_current_figure`
 		current := &figures[indices[0]]
-		if current.previous_figure != nil {
-			current.previous_figure.next_figure = nil
-		}
-		if current.next_figure != nil {
-			current.next_figure.previous_figure = nil
-		}
+		if current.previous_figure != nil do current.previous_figure.next_figure = nil
+		if current.next_figure != nil do current.next_figure.previous_figure = nil
 
 		unordered_remove(&figures, indices[0])
+
+		if indices[0] != len(figures) {
+			if current.previous_figure != nil do current.previous_figure.next_figure = current
+			if current.next_figure != nil do current.next_figure.previous_figure = current
+		}
+
 		heap.pop(indices[:], less)
 		pop(&indices)
-
-		if current.previous_figure != nil {
-			current.previous_figure.next_figure = current
-		}
-		if current.next_figure != nil {
-			current.next_figure.previous_figure = current
-		}
 	}
 
 	// Vaciar la selección
