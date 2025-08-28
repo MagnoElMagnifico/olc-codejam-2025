@@ -17,7 +17,8 @@ Run the specific files for your platform:
 
 # How to use
 
-Controls:
+In _select mode_ (press `1` on your keyboard or the `S` button on the UI) you
+can:
 
 -   Left click and drag to create new figures. You can use the UI on the left to
     configure what properties they will have.
@@ -28,6 +29,15 @@ Controls:
     figures in a rectangular fashion.
 -   Use `Delete` or `Backspace` to delete the figures currently selected.
 -   Left click elsewhere or press `Esc` to cancel the current selection.
+
+The _link mode_ (number `2` or the `V` button) will allow you to create links
+between the different figures to create longer sequences. When a figure's
+counter reaches 0, the linked figure will start playing.
+
+-   To create a new link, left click to select the two figures.
+-   You can only link to one figure, so re-linking a figure will overwrite the
+    previous.
+-   Double click a figure to remove its link (essentially, a link to itself).
 
 # Useful links
 

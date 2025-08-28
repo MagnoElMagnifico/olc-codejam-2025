@@ -1,5 +1,6 @@
 package game
 
+// TODO: customizar estilos, se ve bastante como la caca
 import rl "vendor:raylib"
 
 import "core:c"
@@ -21,7 +22,13 @@ UI_PANEL_DIM :: rect {
 	/* ALTO: cabecera + 4 filas + padding final */ 6 * UI_LINE_HEIGHT + UI_PADDING,
 }
 
-// TODO: mover a game_state
+// Se usa para determinar las propiedades de nuevas figuras
+UI_Create_State :: struct {
+	n_sides: uint,
+	counter: int,
+}
+
+// TODO: mover todas las variables estáticas a game_state
 bpm_text : [dynamic]u8
 char_count := 1
 textBox := rl.Rectangle({0, 0, 50, UI_LINE_HEIGHT - 15 })
@@ -34,24 +41,49 @@ UI_figure_panel_dim := rect {
 	150,
 }
 
-// Se usa para determinar las propiedades de nuevas figuras
-UI_Create_State :: struct {
-	n_sides: uint,
-	counter: int,
+UI_toolbox_ui := rect {
+	0, UI_MARGIN,
+	3 * UI_BUTTON_SIZE + 4 * UI_PADDING,
+	UI_LINE_HEIGHT,
 }
 
-// Convertir el numero actual a cstring para mostrarlo en la UI
-cstr_from_int :: proc(n: int, allocator := context.temp_allocator, loc := #caller_location) -> cstring {
-	// Si es negativo, denota infinito
-	if n < 0 {
-		return "inf"
-	}
+render_toolbox_ui :: proc() {
+	UI_toolbox_ui.x = f32(game_state.window_size.x) / 2 - UI_toolbox_ui.width / 2
 
-	return fmt.caprintf("%d\x00", n, allocator, loc)
+	x := UI_toolbox_ui.x
+	y := UI_toolbox_ui.y
+
+	tool_changed := false
+
+	// TODO: resaltar botón con el modo seleccionado. Ni idea de cómo hacerlo
+
+	if rl.GuiButton({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "S") {
+		game_state.tool = .Select
+		tool_changed = true
+	}
+	x += UI_BUTTON_SIZE + UI_PADDING
+
+	if rl.GuiButton({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "L") {
+		game_state.tool = .Link
+		tool_changed = true
+	}
+	x += UI_BUTTON_SIZE + UI_PADDING
+
+	if rl.GuiButton({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "V") {
+		game_state.tool = .View
+		tool_changed = true
+	}
+	x += UI_BUTTON_SIZE + UI_PADDING
+
+	// Limpiar el estado para que no quede corrupto
+	if tool_changed {
+		game_state.current_figure = nil
+		game_state.state = .View
+		clear(&game_state.selected_figures)
+	}
 }
 
 render_create_figure_ui :: proc() {
-	// TODO: customizar estilos, se ve bastante como la caca
 	using game_state.create_figure_ui
 
 	rl.GuiPanel(UI_PANEL_DIM, "Create figure")
@@ -393,10 +425,10 @@ render_figure_ui :: proc() {
 
 render_debug_info :: proc() {
 	current_x : c.int = UI_MARGIN
-	current_y : c.int = game_state.window_size.y - 6 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
+	current_y : c.int = game_state.window_size.y - 7 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
 
 	rl.DrawText(
-		fmt.caprintf("state: %w\x00", game_state.state, context.temp_allocator),
+		fmt.caprintf("tool: %w\x00", game_state.tool, context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
@@ -404,7 +436,15 @@ render_debug_info :: proc() {
 	current_y += UI_FONT_SIZE + UI_PADDING/2
 
 	rl.DrawText(
-		fmt.caprintf("time: %1.5f\x00", rl.GetFrameTime(), context.temp_allocator),
+		fmt.caprintf("selection: %w\x00", game_state.state, context.temp_allocator),
+		current_x, current_y,
+		UI_FONT_SIZE,
+		rl.WHITE
+	)
+	current_y += UI_FONT_SIZE + UI_PADDING/2
+
+	rl.DrawText(
+		fmt.caprintf("frame time: %1.5f\x00", rl.GetFrameTime(), context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
@@ -457,3 +497,14 @@ check_backspace_action :: proc() -> int{
 		return 1
 	}
 }
+
+// Convertir el numero actual a cstring para mostrarlo en la UI
+cstr_from_int :: proc(n: int, allocator := context.temp_allocator, loc := #caller_location) -> cstring {
+	// Si es negativo, denota infinito
+	if n < 0 {
+		return "inf"
+	}
+
+	return fmt.caprintf("%d\x00", n, allocator, loc)
+}
+

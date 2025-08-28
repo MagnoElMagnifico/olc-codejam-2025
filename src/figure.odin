@@ -1,5 +1,7 @@
 package game
 
+// ==== IMPORTS ===============================================================
+
 import rl "vendor:raylib"
 import m "core:math/linalg"
 
@@ -7,6 +9,8 @@ import "core:c"
 import "core:mem"
 import "core:log"
 import "core:slice/heap"
+
+// ==== CONSTANTS =============================================================
 
 FIGURE_MAX_SIDES     :: 25
 FIGURE_POINT_RADIUS  :: 5.0
@@ -19,16 +23,9 @@ FIGURE_FIRST_POINT_COLOR :: rl.GREEN
 FIGURE_SELECTED_COLOR    :: rl.RED
 
 SELECTION_RECT_COLOR :: rl.Color { 100, 100, 100, 100 }
+LINK_ARROW_HEAD_LEN :: 15.0
 
-Selection_State :: enum {
-	View = 0,
-	Edit_Figure,
-	Selected_Figure,
-	Multiselection,
-	Rectangle_Multiselection,
-	Move_Figure,
-	Multiselection_Move,
-}
+// ==== FIGURE DATA ===========================================================
 
 // Figuras regulares: todos sus lados son iguales
 Regular_Figure :: struct {
@@ -37,6 +34,10 @@ Regular_Figure :: struct {
 	n: uint,
 	bpm: uint,
 	color_fig: rl.Color,
+
+	// Para los enlaces
+	next_figure: ^Regular_Figure,
+	previous_figure: ^Regular_Figure,
 
 	// Indica en qué segmento está el punto: [0, n-1]
 	point_seg_index: uint,
@@ -50,9 +51,11 @@ Regular_Figure :: struct {
 	notes: [FIGURE_MAX_SIDES]Music_Notes,
 }
 
+// ==== INPUT UPDATE ==========================================================
+
 // WARN: Solo poner código relacionado con el ratón, no eventos de teclado
 // WARN: Los chequeos de colisiones con el ratón se deben hacer en screen space
-update_figure_selection :: proc() {
+update_figure_selection_tool :: proc() {
 	using game_state
 
 	// Ignorar eventos mientras se está en la UI
@@ -306,6 +309,53 @@ update_figure_selection :: proc() {
 	}
 }
 
+update_figure_link_tool :: proc() {
+	// Esta herramienta solo funciona al hacer click
+	if !rl.IsMouseButtonPressed(.LEFT) {
+		return
+	}
+
+	selected := select_figure()
+
+	// Si se hizo click en otro lado, cancelar la selección
+	if select_figure == nil {
+		game_state.current_figure = nil
+		return
+	}
+
+	// Almacenar figura seleccionada para crear el siguiente link
+	if game_state.current_figure == nil {
+		game_state.current_figure = selected
+		return
+	}
+
+	// Borrar el link si se hace consigo misma
+	if selected == game_state.current_figure {
+		// Borrar el link con la siguiente figura
+		next := game_state.current_figure.next_figure
+		if next == nil do return
+		game_state.current_figure.next_figure = nil
+
+		// Borrar el backlink anterior
+		next.previous_figure = nil
+
+		// Y cancelar la selección
+		game_state.current_figure = nil
+		return
+	}
+
+	// Crear el enlace con la nueva figura
+	game_state.current_figure.next_figure = selected
+
+	// Crear el backlink
+	selected.previous_figure = game_state.current_figure
+
+	// Y cancelar la selección
+	game_state.current_figure = nil
+}
+
+// ==== STATE UPDATE ==========================================================
+
 update_figure_state :: proc(fig: ^Regular_Figure) {
 	// No procesar figuras que no tienen contador
 	if fig.point_counter == 0 {
@@ -367,6 +417,15 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 	screen_center := to_screen(camera, fig.center)
 	screen_radius := m.vector_length(diff) * camera.zoom
 
+	// No dibujar si está fuera de la pantalla
+	// BUG: los enlaces no se muestran
+	if screen_center.x + screen_radius < 0 ||
+		screen_center.y + screen_radius < 0 ||
+		screen_center.x - screen_radius > f32(window_size.x) ||
+		screen_center.y - screen_radius > f32(window_size.y) {
+		return
+	}
+
 	if fig.n == 2 {
 		// TODO: dibujar hasta y desde el círculo central, pero no atravesarlo
 		point1 := to_screen(camera, fig.center + diff)
@@ -417,13 +476,8 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 		angle1 := 2 * m.PI * f32(fig.point_seg_index)     / f32(fig.n)
 		angle2 := 2 * m.PI * f32(fig.point_seg_index + 1) / f32(fig.n)
 
-		point1: v2
-		point1.x = fig.center.x - (diff.x * m.cos(angle1) - diff.y * m.sin(angle1))
-		point1.y = fig.center.y - (diff.x * m.sin(angle1) + diff.y * m.cos(angle1))
-
-		point2: v2
-		point2.x = fig.center.x - (diff.x * m.cos(angle2) - diff.y * m.sin(angle2))
-		point2.y = fig.center.y - (diff.x * m.sin(angle2) + diff.y * m.cos(angle2))
+		point1 := fig.center - vec_rotate(diff, angle1)
+		point2 := fig.center - vec_rotate(diff, angle2)
 
 		// Ahora interpolar entre las dos posiciones
 		// Ecuación vectorial de una recta: (x, y) = p1 + k * v
@@ -432,6 +486,50 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 		beat_point = to_screen(camera, beat_point)
 
 		rl.DrawCircle(c.int(beat_point.x), c.int(beat_point.y), FIGURE_POINT_RADIUS, point_color)
+	}
+
+	// Dibujar el enlace
+	if fig.next_figure != nil {
+		// Calcular el círculo que cierra la siguiente figura
+		next_diff := fig.next_figure.center - fig.next_figure.radius
+		screen_next_center := to_screen(camera, fig.next_figure.center)
+		screen_next_radius := m.vector_length(next_diff) * camera.zoom
+
+		// Calcular el vector entre los centros
+		line_vector := screen_next_center - screen_center
+
+		// Calcular el vector unitario
+		screen_distance := m.vector_length(line_vector)
+		if abs(screen_distance) < 1.0e-10 do return
+		unit_line_vector := line_vector / screen_distance
+
+		// Crear un vector con la misma dirección pero que no incluya ni el
+		// radio de la figura actual ni de la siguiente
+		line_vector = unit_line_vector * (screen_distance - screen_radius - screen_next_radius)
+
+		// Calcular los puntos iniciales y finales
+		start := screen_center + unit_line_vector*screen_radius
+		end := start + line_vector
+
+		// Ahora hacer como una flecha al final de 60º de amplitud
+		arrow1 := end + vec_rotate(-unit_line_vector, +m.PI/6) * LINK_ARROW_HEAD_LEN
+		arrow2 := end + vec_rotate(-unit_line_vector, -m.PI/6) * LINK_ARROW_HEAD_LEN
+
+		rl.DrawLine(
+			c.int(start.x), c.int(start.y),
+			c.int(end.x), c.int(end.y),
+			color
+		)
+		rl.DrawLine(
+			c.int(end.x), c.int(end.y),
+			c.int(arrow1.x), c.int(arrow1.y),
+			color
+		)
+		rl.DrawLine(
+			c.int(end.x), c.int(end.y),
+			c.int(arrow2.x), c.int(arrow2.y),
+			color
+		)
 	}
 }
 
@@ -635,4 +733,11 @@ is_figure_big_enough :: #force_inline proc "contextless" (fig: Regular_Figure) -
 	screen_center := to_screen(game_state.camera, fig.center)
 	screen_radius := to_screen(game_state.camera, fig.radius)
 	return m.vector_length2(screen_center - screen_radius) > FIGURE_MIN_RADIUS * FIGURE_MIN_RADIUS
+}
+
+@(private="file")
+vec_rotate :: #force_inline proc "contextless" (v: v2, angle: f32) -> (r: v2) {
+	r.x = v.x * m.cos(angle) - v.y * m.sin(angle)
+	r.y = v.x * m.sin(angle) + v.y * m.cos(angle)
+	return
 }

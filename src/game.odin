@@ -43,9 +43,12 @@ STRING_NOTES := [Music_Notes]cstring {
 game_state: Game_State
 Game_State :: struct {
 	// ==== State ====
-	run: bool,                       // Determina si seguir ejecutando el game loop
-	simulation_running: bool,        // Determina si mover los puntos de las figuras
-	state: Selection_State,          // Determinar qué hacen las acciones del ratón
+	run: bool,                // Determina si seguir ejecutando el game loop
+	simulation_running: bool, // Determina si mover los puntos de las figuras
+	tool: Tools,              // Determina qué herramienta se está usando
+
+	// TODO: Renombrar a selection_state
+	state: Selection_State,   // tool == .Select: estado de la selección
 
 	// El uso de las siguientes variables depende de `state`
 	current_figure: ^Regular_Figure,
@@ -66,6 +69,23 @@ Game_State :: struct {
 	music_notes: [Music_Notes]rl.Sound
 }
 
+Selection_State :: enum {
+	View = 0,
+	Edit_Figure,
+	Selected_Figure,
+	Multiselection,
+	Rectangle_Multiselection,
+	Move_Figure,
+	Multiselection_Move,
+}
+
+// Al pulsar el número en el teclado, se cambia a esa herramienta
+Tools :: enum {
+	View = 0,
+	Select = 1,
+	Link = 2,
+}
+
 // ==== GAME INIT =============================================================
 
 import "core:os"
@@ -73,6 +93,9 @@ import "core:math/rand"
 
 init :: proc() {
 	using game_state
+
+	tool = .Select
+	state = .View
 
 	run = true
 	simulation_running = true
@@ -111,23 +134,58 @@ update :: proc() {
 	// ==== Input handling ====================================================
 
 	update_camera()
-	update_figure_selection()
 
 	if rl.IsKeyPressed(.SPACE) {
 		game_state.simulation_running = !game_state.simulation_running
 	}
 
-	if rl.IsKeyPressed(.ESCAPE) {
-		game_state.current_figure = nil
-		clear(&game_state.selected_figures)
-		game_state.state = .View
+	{
+		tool_changed := false
+		if rl.IsKeyPressed(.ZERO) {
+			game_state.tool = .View
+			tool_changed = true
+		}
+
+		if rl.IsKeyPressed(.ONE) {
+			game_state.tool = .Select
+			tool_changed = true
+		}
+
+		if rl.IsKeyPressed(.TWO) {
+			game_state.tool = .Link
+			tool_changed = true
+		}
+
+		// Limpiar el estado para que no quede corrupto
+		if tool_changed {
+			game_state.current_figure = nil
+			game_state.state = .View
+			clear(&game_state.selected_figures)
+		}
 	}
 
-	if rl.IsKeyPressed(.BACKSPACE) && check_backspace_action() == 1 || rl.IsKeyPressed(.DELETE) {
-		if game_state.current_figure != nil do delete_current_figure()
-		else if game_state.state == .Multiselection do delete_multiselected_figures()
-	}
+	// TODO: esto no funciona super bien: aún se pueden crear figuras debajo
+	if rl.IsMouseButtonDown(.LEFT) || !rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_toolbox_ui) {
+		switch game_state.tool {
+		case .View: break
+		case .Select:
+			update_figure_selection_tool()
 
+			if rl.IsKeyPressed(.ESCAPE) {
+				game_state.current_figure = nil
+				clear(&game_state.selected_figures)
+				game_state.state = .View
+			}
+
+			if rl.IsKeyPressed(.BACKSPACE) && check_backspace_action() == 1 || rl.IsKeyPressed(.DELETE) {
+				if game_state.current_figure != nil do delete_current_figure()
+				else if game_state.state == .Multiselection do delete_multiselected_figures()
+			}
+
+		case .Link:
+			update_figure_link_tool()
+		}
+	}
 
 	// ==== Render ============================================================
 	rl.BeginDrawing()
@@ -163,38 +221,49 @@ update :: proc() {
 		render_regular_figure(f, f.color_fig)
 	}
 
-	// Render la figura seleccionada en un color distinto
-	// PERF: Se dibujarán 2 veces las figuras seleccionadas
-	switch game_state.state {
-	case .View: break
+	switch game_state.tool {
+	case .View:
+	case .Select:
+		// Render la figura seleccionada en un color distinto
+		// PERF: Se dibujarán 2 veces las figuras seleccionadas
+		switch game_state.state {
+		case .View: break
 
-	case .Edit_Figure: fallthrough
-	case .Selected_Figure: fallthrough
-	case .Move_Figure:
-		render_selected_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
-		render_figure_ui()
+		case .Edit_Figure: fallthrough
+		case .Selected_Figure: fallthrough
+		case .Move_Figure:
+			render_selected_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
+			render_figure_ui()
 
-	case .Multiselection: fallthrough
-	case .Multiselection_Move:
-		for fig in game_state.selected_figures {
-			render_regular_figure(fig^, FIGURE_SELECTED_COLOR, FIGURE_SELECTED_COLOR, false)
+		case .Multiselection: fallthrough
+		case .Multiselection_Move:
+			for fig in game_state.selected_figures {
+				render_regular_figure(fig^, FIGURE_SELECTED_COLOR, FIGURE_SELECTED_COLOR, false)
+			}
+
+		case .Rectangle_Multiselection:
+			rl.DrawRectangleRec(game_state.selection_rect, SELECTION_RECT_COLOR)
 		}
 
-	case .Rectangle_Multiselection:
-		rl.DrawRectangleRec(game_state.selection_rect, SELECTION_RECT_COLOR)
+		render_create_figure_ui()
+
+	case .Link:
+		if game_state.current_figure != nil {
+			render_selected_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
+		}
 	}
 
-	// ==== UI ================================================================
-	// Debe ejecutarse después de las figuras para que se muestre por encima.
-	// Esto puede ser molesto porque el frame ya se ha dibujado, entonces el
-	// input de la UI se procesará para el siguiente frame.
+	render_toolbox_ui()
 
-	render_create_figure_ui()
-	render_debug_info()
+	when ODIN_DEBUG {
+		render_debug_info()
+	}
 
 	// Borrar memoria temporal
 	free_all(context.temp_allocator)
 }
+
+// ==== OTHER CALLBACKS =======================================================
 
 // In a web build, this is called when browser changes size. Remove
 // the `rl.SetWindowSize` call if you don't want a resizable game.
