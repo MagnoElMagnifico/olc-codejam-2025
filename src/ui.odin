@@ -468,7 +468,7 @@ render_debug_info :: proc() {
 	current_y += UI_FONT_SIZE + UI_PADDING/2
 
 	rl.DrawText(
-		fmt.caprintf("n total figures: %d\x00", len(game_state.figures), context.temp_allocator),
+		fmt.caprintf("figures len: %d, figures cap: %d\x00", len(game_state.figures), cap(game_state.figures), context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE

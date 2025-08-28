@@ -97,6 +97,7 @@ update_figure_selection_tool :: proc() {
 
 				center := to_world(game_state.camera, rl.GetMousePosition())
 
+				ensure(len(figures) < MAX_FIGURES, "Maximum figures reached")
 				append(&figures, Regular_Figure {
 					center = center,
 					radius = center,
@@ -612,9 +613,48 @@ delete_current_figure :: proc() {
 		"para borrar una figura, esta debe estar seleccionada"
 	)
 
-	// Mueve el último elemento al actual y reduce la longitud
+	// Borrar una figura causa que se reorganicen otras en el array, lo que
+	// invalida los punteros. Existen los siguientes casos:
+	//
+	// 1.  Borrar el apuntado y que el apuntado sea el último:
+	//     el puntero ahora apunta más allá del array ==> crasheos
+	//
+	// 2.  Borrar el apuntado y que el apuntado no sea el último:
+	//     se cambiará el borrado por el último ==> el puntero es erróneo
+	//
+	// 3.  Borrar otro y el apuntado sea el último:
+	//     el apuntado se moverá donde estaba otro ==> el puntero es erróneo
+	//
+	// 4.  Borrar otro y el apuntado no es el último:
+	//     no hay problemas
+	//
+	// Lo mismo sucede en el otro sentido: si se borra el que apunta, el puntero
+	// de vuelta (backlink) puntero ya no será válido.
+
+	// Gestionar casos 1 y 2: eliminar links
+	if current_figure.previous_figure != nil {
+		current_figure.previous_figure.next_figure = nil
+	}
+
+	if current_figure.next_figure != nil {
+		current_figure.next_figure.previous_figure = nil
+	}
+
+	// Mueve el último elemento al actual y reduce la longitud en 1
 	index := mem.ptr_sub(current_figure, &figures[0])
 	unordered_remove(&figures, index)
+
+	// Gestionar caso 3: ahora current_figure apunta al elemento que estaba al
+	// final. Debemos poner el puntero de la figura que lo apuntaba a la nueva
+	// posición
+	if current_figure.previous_figure != nil {
+		current_figure.previous_figure.next_figure = current_figure
+	}
+
+	// Lo mismo pero para el backlink
+	if current_figure.next_figure != nil {
+		current_figure.next_figure.previous_figure = current_figure
+	}
 
 	state = .View
 	current_figure = nil
@@ -650,9 +690,25 @@ delete_multiselected_figures :: proc() {
 
 	// Y borrarlos por orden
 	for i in 0 ..< len(selected_figures) {
+		// No romper los links: ver explicación en `delete_current_figure`
+		current := &figures[indices[0]]
+		if current.previous_figure != nil {
+			current.previous_figure.next_figure = nil
+		}
+		if current.next_figure != nil {
+			current.next_figure.previous_figure = nil
+		}
+
 		unordered_remove(&figures, indices[0])
 		heap.pop(indices[:], less)
 		pop(&indices)
+
+		if current.previous_figure != nil {
+			current.previous_figure.next_figure = current
+		}
+		if current.next_figure != nil {
+			current.next_figure.previous_figure = current
+		}
 	}
 
 	// Vaciar la selección

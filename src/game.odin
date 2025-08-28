@@ -6,17 +6,16 @@ import rl "vendor:raylib"
 import "core:c"
 import "core:log"
 
-// ==== CONSTANTS =============================================================
-
 // Definiciones de tipos comunes (por comodidad)
 iv2 :: [2]c.int
 v2 :: rl.Vector2     // [2]f32
 rect :: rl.Rectangle // { x, y, width, height: f32 }
 
-COLOR_PICKER : [3]u8 = {0,127,255}
+// ==== CONSTANTS =============================================================
 
 WINDOW_NAME :: "Synth Shapes"
 WINDOW_SIZE :: iv2 {1280, 720}
+MAX_FIGURES :: 10 when ODIN_DEBUG else 1024
 
 Music_Notes :: enum u8 {
 	// TODO: Añadir más notas?
@@ -24,7 +23,10 @@ Music_Notes :: enum u8 {
 	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep, Null
 }
 
-// Técnicamente una constante. No cambiar :(
+@(rodata)
+COLOR_PICKER := [3]u8 {0, 127, 255}
+
+@(rodata)
 STRING_NOTES := [Music_Notes]cstring {
 	.Do = "Do",
 	.Re = "Re",
@@ -104,6 +106,31 @@ init :: proc() {
 	create_figure_ui.counter = -1
 	window_size = WINDOW_SIZE
 	volume = 10
+
+	// `game_state.figures` contiene punteros a otros elementos del array, por
+	// lo que si se mueven los elementos de un lado para otro al borrar y
+	// añadir, tendremos bugs de memoria (se apunta a figuras incorrectas) y
+	// crasheos (punteros inválidos).
+	//
+	// Para arreglarlo, las funciones `delete_current_figure` y
+	// `delete_multiselected_figures` gestionan los casos apropiadamente.
+	//
+	// Pero para añadir nuevas figuras, cuando el buffer actual sea muy pequeño,
+	// se copiarán los a un buffer más grande. En tal caso se invalidarán todos
+	// los punteros.
+	//
+	// Una solución es usar los índices de las figuras, ya que no dependen de la
+	// posición absoluta en memoria, sino de la distancia al inicio del buffer.
+	// Como se copian por orden, no hay problema.
+	//
+	// Otra opción es mantener los punteros y usar un buffer con una capacidad
+	// fija, y así evitar que se copien a otros lugares. Esta es ligeramente más
+	// eficiente, porque evita estas copias (que son lentas cuando el buffer es
+	// grande), pero tiene un mayor uso de memoria y se impone un límite máximo
+	// de figuras.
+	figures = make([dynamic]Regular_Figure, 0, MAX_FIGURES)
+	log.info("Regular_Figure size:", size_of(Regular_Figure))
+	log.info("Total memory for figures:", size_of(Regular_Figure) * MAX_FIGURES)
 
 	rl.SetConfigFlags({.WINDOW_RESIZABLE, .MSAA_4X_HINT, .VSYNC_HINT})
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
