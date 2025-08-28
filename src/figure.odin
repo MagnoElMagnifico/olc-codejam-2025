@@ -341,7 +341,9 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 
 	// Cambiar de vértice
 	if fig.point_progress > 1.0 {
-		rl.PlaySound(game_state.music_notes[fig.notes[Music_Notes(fig.point_seg_index)]])
+		sound_to_play := game_state.music_notes[fig.notes[Music_Notes(fig.point_seg_index)]]
+		rl.SetSoundVolume(sound_to_play, f32(game_state.volume/10))
+		rl.PlaySound(sound_to_play)
 		fig.point_progress = 0.0
 		fig.point_seg_index += 1
 

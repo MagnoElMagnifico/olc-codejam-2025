@@ -57,6 +57,7 @@ Game_State :: struct {
 	figures: [dynamic]Regular_Figure,
 	camera: Camera,
 	create_figure_ui: UI_Create_State,
+	volume: f32,
 
 	// ==== Information ====
 	window_size: iv2,
@@ -79,6 +80,7 @@ init :: proc() {
 	create_figure_ui.n_sides = 3
 	create_figure_ui.counter = -1
 	window_size = WINDOW_SIZE
+	volume = 10
 
 	rl.SetConfigFlags({.WINDOW_RESIZABLE, .MSAA_4X_HINT, .VSYNC_HINT})
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
@@ -158,7 +160,6 @@ update :: proc() {
 			}
 			f.color_fig = {r,g,b,255}
 		}
-		log.info(f.color_fig)
 		render_regular_figure(f, f.color_fig)
 	}
 

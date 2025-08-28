@@ -18,7 +18,7 @@ UI_BUTTON_SIZE :: UI_LINE_HEIGHT - UI_PADDING
 UI_PANEL_DIM :: rect {
 	UI_MARGIN, UI_MARGIN,
 	/* MAX ANCHO: text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40,
-	/* ALTO: cabecera + 4 filas + padding final */ 5 * UI_LINE_HEIGHT + UI_PADDING,
+	/* ALTO: cabecera + 4 filas + padding final */ 6 * UI_LINE_HEIGHT + UI_PADDING,
 }
 
 // TODO: mover a game_state
@@ -110,6 +110,7 @@ render_create_figure_ui :: proc() {
 
 	// TODO: esto modifica otras cosas, no realmente la creación de nuevas
 	// figuras. Mover a su propio panel?
+	// Nu se. A cuál lo quieres mover?
 
 	// Sincronizar puntos
 	{
@@ -161,6 +162,32 @@ render_create_figure_ui :: proc() {
 			}
 		}
 	}
+
+	current_x = UI_PANEL_DIM.x + UI_PADDING
+	current_y += UI_LINE_HEIGHT
+
+	//Volumen
+	{
+		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Volume:")
+		rl.GuiLabel({current_x + 50, current_y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(game_state.volume)))
+
+		// añadir el width del elemento y padding para el siguiente
+		current_x += 100 + UI_PADDING
+
+		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
+			game_state.volume = min(game_state.volume + 1, 10)
+		}
+		current_x += UI_LINE_HEIGHT + UI_PADDING
+
+		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
+			game_state.volume = max(game_state.volume - 1, 0)
+		}
+		current_x += UI_LINE_HEIGHT + UI_PADDING
+	}
+
+	current_x = UI_PADDING + UI_MARGIN
+	current_y += UI_LINE_HEIGHT
+
 }
 
 render_figure_ui :: proc() {
