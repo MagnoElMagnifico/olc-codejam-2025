@@ -490,7 +490,7 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 
 	// Dibujar el enlace
 	if fig.next_figure != nil {
-		// Calcular el círculo que cierra la siguiente figura
+		// Calcular los valores de la siguiente figura
 		next_diff := fig.next_figure.center - fig.next_figure.radius
 		screen_next_center := to_screen(camera, fig.next_figure.center)
 		screen_next_radius := m.vector_length(next_diff) * camera.zoom
@@ -503,13 +503,19 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 		if abs(screen_distance) < 1.0e-10 do return
 		unit_line_vector := line_vector / screen_distance
 
-		// Crear un vector con la misma dirección pero que no incluya ni el
-		// radio de la figura actual ni de la siguiente
-		line_vector = unit_line_vector * (screen_distance - screen_radius - screen_next_radius)
+		end, start: v2
+		// Si la distancia es muy pequeña, dibujar línea entre los centros
+		// directamente
+		if screen_distance - 3*LINK_ARROW_HEAD_LEN < screen_radius + screen_next_radius {
+			start = screen_center + unit_line_vector*FIGURE_SELECTOR_SIZE
+			end = screen_center + unit_line_vector * (screen_distance - FIGURE_SELECTOR_SIZE)
 
-		// Calcular los puntos iniciales y finales
-		start := screen_center + unit_line_vector*screen_radius
-		end := start + line_vector
+		} else {
+			// Sino, dibujar la línea entre los círculos que encierran las
+			// figuras
+			start = screen_center + unit_line_vector*screen_radius
+			end = start + unit_line_vector * (screen_distance - screen_radius - screen_next_radius)
+		}
 
 		// Ahora hacer como una flecha al final de 60º de amplitud
 		arrow1 := end + vec_rotate(-unit_line_vector, +m.PI/6) * LINK_ARROW_HEAD_LEN
