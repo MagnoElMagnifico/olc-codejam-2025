@@ -16,6 +16,9 @@ rect :: rl.Rectangle // { x, y, width, height: f32 }
 WINDOW_NAME :: "Synth Shapes"
 WINDOW_SIZE :: iv2 {1280, 720}
 
+//En teoría es cte
+COLOR_PICKER : [3]u8 = {0,127,255}
+
 Music_Notes :: enum u8 {
 	// TODO: Añadir más notas?
 	// TODO: hacer Null = 0 para que sea la nota por defecto?
@@ -45,11 +48,9 @@ Game_State :: struct {
 	simulation_running: bool,        // Determina si mover los puntos de las figuras
 	state: Selection_State,          // Determinar qué hacen las acciones del ratón
 
-	// El uso de las siguientes variables depende de `state`
-	current_figure: ^Regular_Figure,
+	// BUG: puede que tengamos que cambiar los punteros por índices
+	current_figure: ^Regular_Figure, // nil: nada seleccionado
 	selected_figures: [dynamic]^Regular_Figure,
-	selection_rect: rect,
-	selection_rect_center: v2,
 
 	// ==== Objects ====
 	figures: [dynamic]Regular_Figure,
@@ -66,6 +67,7 @@ Game_State :: struct {
 // ==== GAME INIT =============================================================
 
 import "core:os"
+import "core:math/rand"
 
 init :: proc() {
 	using game_state
@@ -103,10 +105,9 @@ update :: proc() {
 		parent_window_size_changed(rl.GetScreenWidth(), rl.GetScreenHeight())
 	}
 
-	// ==== Input handling ====================================================
-
+	// ==== Game input handling ===============================================
 	update_camera()
-	update_figure_selection()
+	update_figure_mouse_input()
 
 	if rl.IsKeyPressed(.SPACE) {
 		game_state.simulation_running = !game_state.simulation_running
@@ -123,50 +124,56 @@ update :: proc() {
 		else if game_state.state == .Multiselection do delete_multiselected_figures()
 	}
 
-
 	// ==== Render ============================================================
 	rl.BeginDrawing()
 	defer rl.EndDrawing()
 
 	rl.ClearBackground({30, 30, 30, 255})
 
+	// Render todas las figuras
 	for &f in game_state.figures {
-		// Esto es mejor que actualizar todo y luego renderizar: solo se
-		// recorren todas las figuras una vez. El `if` no importa mucho porque
-		// es constante y el branch predictor lo detectará bien.
+		// PERF: quizá mover el if a su propio bucle, pero el branch predictor
+		// lo detectará bien porque es constante
 		if game_state.simulation_running {
 			update_figure_state(&f)
 		}
-
-		render_regular_figure(f, FIGURE_VIEW_COLOR)
+		//TODO: Este trozo de código hace crashear sin error el programa tras deseleccionar la figura
+		/*
+		//log.info(game_state.current_figure.color_fig)
+		if game_state.current_figure.color_fig[3] == 0 {
+			//Esta estructura de dato aleatorio es para prevenir que se seleccione un color demasiado oscuro
+			stop_random := false
+			r : u8 = 0
+			g : u8 = 0
+			b : u8 = 0
+			for !stop_random {
+				r = rand.choice(COLOR_PICKER[:])
+				g = rand.choice(COLOR_PICKER[:])
+				b = rand.choice(COLOR_PICKER[:])
+				if r != 0 || b != 0 || g != 0 {
+					stop_random = true
+				}
+			}
+			game_state.current_figure.color_fig = {r,g,b,255}
+		}
+		game_state.current_figure.color_fig = {255,255,255,255}*/
+		render_regular_figure(f, rl.WHITE)
 	}
 
 	// Render la figura seleccionada en un color distinto
 	// PERF: Se dibujarán 2 veces las figuras seleccionadas
-	switch game_state.state {
-	case .View: break
-
-	case .Edit_Figure: fallthrough
-	case .Selected_Figure: fallthrough
-	case .Move_Figure:
+	if game_state.state == .Edit_Figure || game_state.state == .Selected_Figure || game_state.state == .Move_Figure {
 		render_selected_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
 		render_figure_ui()
-
-	case .Multiselection: fallthrough
-	case .Multiselection_Move:
+	} else if game_state.state == .Multiselection {
 		for fig in game_state.selected_figures {
 			render_regular_figure(fig^, FIGURE_SELECTED_COLOR, FIGURE_SELECTED_COLOR, false)
 		}
-
-	case .Rectangle_Multiselection:
-		rl.DrawRectangleRec(game_state.selection_rect, SELECTION_RECT_COLOR)
 	}
 
-	// ==== UI ================================================================
-	// Debe ejecutarse después de las figuras para que se muestre por encima.
-	// Esto puede ser molesto porque el frame ya se ha dibujado, entonces el
-	// input de la UI se procesará para el siguiente frame.
-
+	// Render UI: debe ejecutarse después de las figuras para que se muestre por
+	// encima. Esto puede ser molesto porque el frame ya se ha dibujado,
+	// entonces el input de la UI se procesará para el siguiente frame.
 	render_create_figure_ui()
 	render_debug_info()
 
