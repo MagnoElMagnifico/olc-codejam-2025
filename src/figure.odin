@@ -6,22 +6,28 @@ import m "core:math/linalg"
 import "core:c"
 import "core:mem"
 import "core:log"
+import "core:slice/heap"
 
 FIGURE_MAX_SIDES     :: 25
 FIGURE_POINT_RADIUS  :: 5.0
 FIGURE_MIN_RADIUS    :: 35
 FIGURE_SELECTOR_SIZE :: 20
 
+FIGURE_VIEW_COLOR        :: rl.WHITE
 FIGURE_BEAT_COLOR        :: rl.SKYBLUE
 FIGURE_FIRST_POINT_COLOR :: rl.GREEN
 FIGURE_SELECTED_COLOR    :: rl.RED
+
+SELECTION_RECT_COLOR :: rl.Color { 100, 100, 100, 100 }
 
 Selection_State :: enum {
 	View = 0,
 	Edit_Figure,
 	Selected_Figure,
 	Multiselection,
+	Rectangle_Multiselection,
 	Move_Figure,
+	Multiselection_Move,
 }
 
 // Figuras regulares: todos sus lados son iguales
@@ -30,7 +36,6 @@ Regular_Figure :: struct {
 	radius: v2,
 	n: uint,
 	bpm: uint,
-	color_fig : rl.Color,
 
 	// Indica en qué segmento está el punto: [0, n-1]
 	point_seg_index: uint,
@@ -46,7 +51,7 @@ Regular_Figure :: struct {
 
 // WARN: Solo poner código relacionado con el ratón, no eventos de teclado
 // WARN: Los chequeos de colisiones con el ratón se deben hacer en screen space
-update_figure_mouse_input :: proc() {
+update_figure_selection :: proc() {
 	using game_state
 
 	// Ignorar eventos mientras se está en la UI
@@ -58,9 +63,20 @@ update_figure_mouse_input :: proc() {
 		return
 	}
 
+	// Como se puede saltar a este modo desde cualquier otro, poner esto aquí
+	if rl.IsMouseButtonPressed(.RIGHT) {
+		state = .Rectangle_Multiselection
+		current_figure = nil
+
+		// TODO: Si se presiona shift se extiende la selección
+		// El problema es que habría que comprobar que no añadir duplicados,
+		// cosa que lo hace más lento todavía
+		clear(&selected_figures)
+	}
+
 	switch state {
 	case .View: {
-		assert(current_figure == nil, "En modo .View, current_figure debe ser nil")
+		assert(current_figure == nil && len(selected_figures) == 0, "En modo .View, current_figure debe ser nil")
 
 		if rl.IsMouseButtonPressed(.LEFT) || rl.IsMouseButtonDown(.LEFT) {
 			// Comprobar si se seleccionan figuras
@@ -94,7 +110,7 @@ update_figure_mouse_input :: proc() {
 	}
 
 	case .Edit_Figure: {
-		assert(current_figure != nil, "Modo .New_Figure requiere una figura seleccionada")
+		assert(current_figure != nil && len(selected_figures) == 0, "Modo .New_Figure requiere una figura seleccionada")
 
 		if rl.IsMouseButtonDown(.LEFT) {
 			// TODO: para que sean números enteros, aquí hay que hacer
@@ -115,7 +131,7 @@ update_figure_mouse_input :: proc() {
 	}
 
 	case .Move_Figure: {
-		assert(current_figure != nil, "Modo .Move_Figure require una figura seleccionada")
+		assert(current_figure != nil && len(selected_figures) == 0, "Modo .Move_Figure requiere una figura seleccionada")
 
 		if rl.IsMouseButtonDown(.LEFT) {
 			diff := current_figure.center - current_figure.radius
@@ -123,6 +139,23 @@ update_figure_mouse_input :: proc() {
 			current_figure.radius = current_figure.center - diff
 		} else {
 			state = .Selected_Figure
+		}
+	}
+
+	case .Multiselection_Move: {
+		assert(current_figure != nil && len(selected_figures) != 0, "Modo .Multiselection_Move requiere varias figuras seleccionadas y current_figure a la que hace click el ratón")
+
+		if rl.IsMouseButtonDown(.LEFT) {
+			mouse_world := to_world(camera, rl.GetMousePosition())
+			moved := mouse_world - current_figure.center 
+
+			for &f in selected_figures {
+				f.center += moved
+				f.radius += moved
+			}
+		} else {
+			state = .Multiselection
+			current_figure = nil
 		}
 	}
 
@@ -220,9 +253,52 @@ update_figure_mouse_input :: proc() {
 					current_figure = selected
 					clear(&selected_figures)
 				} else {
-					// TODO: Mover figuras seleccionadas
-					log.warn("sin implementar: mover figuras")
+					state = .Multiselection_Move
+					// Usar current_figure como la que está en el ratón
+					current_figure = selected
 				}
+			}
+		}
+	}
+
+	case .Rectangle_Multiselection: {
+		assert(current_figure == nil && len(selected_figures) == 0, "En modo .Rectangle_Multiselection, no debe haber nada seleccionado")
+
+		if rl.IsMouseButtonPressed(.RIGHT) {
+			selection_rect_center = rl.GetMousePosition()
+			selection_rect = {}
+
+		} else if rl.IsMouseButtonDown(.RIGHT) {
+			mouse := rl.GetMousePosition()
+
+			// Calcular el rectángulo de selección correcto
+			base := v2 { min(mouse.x, selection_rect_center.x), min(mouse.y, selection_rect_center.y) }
+			top := v2 { max(mouse.x, selection_rect_center.x), max(mouse.y, selection_rect_center.y) }
+			size := top - base
+
+			selection_rect = {
+				base.x, base.y, size.x, size.y
+			}
+
+		} else if rl.IsMouseButtonReleased(.RIGHT) {
+			// PERF: esto es bastante ineficiente porque requiere iterar por
+			// todas las figuras. Quizá se podría hacer en update_figure_state...
+			for &f in figures {
+				if rl.CheckCollisionPointRec(f.center, selection_rect) {
+					append(&selected_figures, &f)
+				}
+			}
+
+			if len(selected_figures) == 0 {
+				state = .View
+
+			} else if len(selected_figures) == 1 {
+				state = .Selected_Figure
+				current_figure = selected_figures[0]
+				clear(&selected_figures)
+
+			} else {
+				state = .Multiselection
 			}
 		}
 	}
@@ -442,12 +518,35 @@ delete_multiselected_figures :: proc() {
 		"No está en modo Multiselect"
 	)
 
-	for f in selected_figures {
+	// No se pueden borrar directamente, porque eso rompe los punteros: al
+	// reorganizar las figuras después de borrar un elemento, otro puntero a
+	// borrar después apuntará al lugar erróneo.
+	//
+	// Para solucionarlo, se calcularán todos los índices de los elementos y se
+	// borrarán del final al principio.
+	//
+	// No es un algoritmo demasiado rápido pero al menos no depende del tamaño
+	// de figures, solo del tamaño de la selección (que no debe ser muy grande).
+
+	// Array dinámico del mismo tamaño que la selección que almacena los índices
+	indices := make([dynamic]int, len(selected_figures), context.temp_allocator)
+	for f, i in selected_figures {
 		index := mem.ptr_sub(f, &figures[0])
-		// BUG: algunas veces peta porque el índice no está en rango
-		unordered_remove(&figures, index)
+		indices[i] = index
 	}
 
+	// Ordenar de mayor a menor
+	less :: proc(a, b: int) -> bool { return a < b }
+	heap.make(indices[:], less)
+
+	// Y borrarlos por orden
+	for i in 0 ..< len(selected_figures) {
+		unordered_remove(&figures, indices[0])
+		heap.pop(indices[:], less)
+		pop(&indices)
+	}
+
+	// Vaciar la selección
 	clear(&selected_figures)
 	state = .View
 }
