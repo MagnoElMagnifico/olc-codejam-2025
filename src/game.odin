@@ -13,6 +13,8 @@ iv2 :: [2]c.int
 v2 :: rl.Vector2     // [2]f32
 rect :: rl.Rectangle // { x, y, width, height: f32 }
 
+COLOR_PICKER : [3]u8 = {0,127,255}
+
 WINDOW_NAME :: "Synth Shapes"
 WINDOW_SIZE :: iv2 {1280, 720}
 
@@ -66,6 +68,7 @@ Game_State :: struct {
 // ==== GAME INIT =============================================================
 
 import "core:os"
+import "core:math/rand"
 
 init :: proc() {
 	using game_state
@@ -138,7 +141,25 @@ update :: proc() {
 			update_figure_state(&f)
 		}
 
-		render_regular_figure(f, FIGURE_VIEW_COLOR)
+				//log.info(game_state.current_figure.color_fig)
+		if f.color_fig[3] != 255 {
+			//Esta estructura de dato aleatorio es para prevenir que se seleccione un color demasiado oscuro
+			stop_random := false
+			r : u8 = 0
+			g : u8 = 0
+			b : u8 = 0
+			for !stop_random {
+				r = rand.choice(COLOR_PICKER[:])
+				g = rand.choice(COLOR_PICKER[:])
+				b = rand.choice(COLOR_PICKER[:])
+				if r != 0 || b != 0 || g != 0 {
+					stop_random = true
+				}
+			}
+			f.color_fig = {r,g,b,255}
+		}
+		log.info(f.color_fig)
+		render_regular_figure(f, f.color_fig)
 	}
 
 	// Render la figura seleccionada en un color distinto

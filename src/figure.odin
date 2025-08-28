@@ -36,6 +36,7 @@ Regular_Figure :: struct {
 	radius: v2,
 	n: uint,
 	bpm: uint,
+	color_fig: rl.Color,
 
 	// Indica en qué segmento está el punto: [0, n-1]
 	point_seg_index: uint,
