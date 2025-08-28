@@ -20,8 +20,9 @@ Run the specific files for your platform:
 In _select mode_ (press `1` on your keyboard or the `S` button on the UI) you
 can:
 
--   Left click and drag to create new figures. You can use the UI on the left to
-    configure what properties they will have.
+-   Left click and drag to create new figures (note that if the figure is too
+    small, it will be deleted). You can use the UI on the left to configure what
+    properties they will have.
 -   Left click on the circle on the center of the figure to select it. With the
     UI on the right, you will be able to modify its properties: point speed,
     music notes, the counter, number of sides of the figure, etc.
@@ -38,6 +39,12 @@ counter reaches 0, the linked figure will start playing.
 -   You can only link to one figure, so re-linking a figure will overwrite the
     previous.
 -   Double click a figure to remove its link (essentially, a link to itself).
+
+Please note that if you create loops (link a figure to other and the other to
+the figure), they will stop!
+
+Anytime, you can use `Space` to pause the simulation and the mouse wheel to move
+the camera around.
 
 # Useful links
 
