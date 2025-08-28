@@ -357,8 +357,10 @@ update_figure_link_tool :: proc() {
 // ==== STATE UPDATE ==========================================================
 
 update_figure_state :: proc(fig: ^Regular_Figure) {
-	// No procesar figuras que no tienen contador
-	if fig.point_counter == 0 {
+	// No procesar figuras que no tienen contador o que tienen un link hacia
+	// ellas y su anterior no terminó aún
+	if fig.point_counter == 0 ||
+		(fig.previous_figure != nil && fig.previous_figure.point_counter != 0) {
 		return
 	}
 
