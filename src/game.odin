@@ -11,12 +11,14 @@ import "core:math/rand"
 iv2 :: [2]c.int
 v2 :: rl.Vector2     // [2]f32
 rect :: rl.Rectangle // { x, y, width, height: f32 }
+color :: rl.Color    // [4]u8
 
 // ==== CONSTANTS =============================================================
 
 WINDOW_NAME :: "Synth Shapes"
 WINDOW_SIZE :: iv2 {1280, 720}
 MAX_FIGURES :: 10 when ODIN_DEBUG else 1024
+BACKGROUND_COLOR :: color { 30, 30, 30, 255 }
 
 Music_Notes :: enum u8 {
 	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep, Null,
@@ -98,6 +100,8 @@ init :: proc() {
 	camera.zoom = 1.0
 	window_size = WINDOW_SIZE
 
+	// TODO: usar otra fuente
+	ui.font = rl.GetFontDefault()
 	ui.creation_n_sides = 3
 	ui.creation_counter = -1
 	ui.volume = 10
@@ -218,7 +222,7 @@ update :: proc() {
 	rl.BeginDrawing()
 	defer rl.EndDrawing()
 
-	rl.ClearBackground({30, 30, 30, 255})
+	rl.ClearBackground(BACKGROUND_COLOR)
 
 	for &f in game_state.figures {
 		// Esto es mejor que actualizar todo y luego renderizar: solo se
