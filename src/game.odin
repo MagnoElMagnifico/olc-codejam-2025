@@ -19,8 +19,6 @@ WINDOW_SIZE :: iv2 {1280, 720}
 MAX_FIGURES :: 10 when ODIN_DEBUG else 1024
 
 Music_Notes :: enum u8 {
-	// TODO: Añadir más notas?
-	// TODO: hacer Null = 0 para que sea la nota por defecto?
 	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep, Null,
 }
 
@@ -48,12 +46,11 @@ Game_State :: struct {
 	// ==== State ====
 	run: bool,                // Determina si seguir ejecutando el game loop
 	simulation_running: bool, // Determina si mover los puntos de las figuras
-	tool: Tools,              // Determina qué herramienta se está usando
 
-	// TODO: Renombrar a selection_state
+	tool: Tools,              // Determina qué herramienta se está usando
 	state: Selection_State,   // tool == .Select: estado de la selección
 
-	// El uso de las siguientes variables depende de `state`
+	// El uso de las siguientes variables depende de `Selection_State`
 	current_figure: ^Regular_Figure,
 	selected_figures: [dynamic]^Regular_Figure,
 	selection_rect: rect,
@@ -62,8 +59,7 @@ Game_State :: struct {
 	// ==== Objects ====
 	figures: [dynamic]Regular_Figure,
 	camera: Camera,
-	create_figure_ui: UI_Create_State,
-	volume: f32,
+	ui: UI_State,
 
 	// ==== Information ====
 	window_size: iv2,
@@ -94,16 +90,18 @@ Tools :: enum {
 init :: proc() {
 	using game_state
 
+	run = true
+	simulation_running = true
 	tool = .Select
 	state = .View
 
-	run = true
-	simulation_running = true
 	camera.zoom = 1.0
-	create_figure_ui.n_sides = 3
-	create_figure_ui.counter = -1
 	window_size = WINDOW_SIZE
-	volume = 10
+
+	ui.creation_n_sides = 3
+	ui.creation_counter = -1
+	ui.volume = 10
+	update_ui_dimensions()
 
 	// `game_state.figures` contiene punteros a otros elementos del array, por
 	// lo que si se mueven los elementos de un lado para otro al borrar y
@@ -190,7 +188,7 @@ update :: proc() {
 	}
 
 	// TODO: esto no funciona super bien: aún se pueden crear figuras debajo
-	if rl.IsMouseButtonDown(.LEFT) || !rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_toolbox_ui) {
+	if rl.IsMouseButtonDown(.LEFT) || !rl.CheckCollisionPointRec(rl.GetMousePosition(), game_state.ui.panel_toolbox) {
 		switch game_state.tool {
 		case .View: break
 		case .Select:
@@ -299,6 +297,8 @@ update :: proc() {
 // the `rl.SetWindowSize` call if you don't want a resizable game.
 parent_window_size_changed :: proc(w, h: c.int) {
 	game_state.window_size = {w, h}
+	update_ui_dimensions()
+
 	when ODIN_OS == .JS {
 		// No ejecutar en desktop porque lo leemos desde la propia ventana
 		rl.SetWindowSize(w, h)

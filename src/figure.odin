@@ -25,6 +25,7 @@ FIGURE_SELECTED_COLOR    :: rl.RED
 
 SELECTION_RECT_COLOR :: rl.Color { 100, 100, 100, 100 }
 LINK_ARROW_HEAD_LEN :: 15.0
+COUNTER_INF :: -1
 
 // ==== FIGURE DATA ===========================================================
 
@@ -60,11 +61,11 @@ update_figure_selection_tool :: proc() {
 	using game_state
 
 	// Ignorar eventos mientras se está en la UI
-	if state != .Move_Figure && rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_PANEL_DIM) {
+	if state != .Move_Figure && rl.CheckCollisionPointRec(rl.GetMousePosition(), ui.panel_create_figure) {
 		return
 	}
 
-	if state == .Selected_Figure && rl.CheckCollisionPointRec(rl.GetMousePosition(), UI_figure_panel_dim) {
+	if state == .Selected_Figure && rl.CheckCollisionPointRec(rl.GetMousePosition(), ui.panel_figure) {
 		return
 	}
 
@@ -72,10 +73,6 @@ update_figure_selection_tool :: proc() {
 	if rl.IsMouseButtonPressed(.RIGHT) {
 		state = .Rectangle_Multiselection
 		current_figure = nil
-
-		// TODO: Si se presiona shift se extiende la selección
-		// El problema es que habría que comprobar que no añadir duplicados,
-		// cosa que lo hace más lento todavía
 		clear(&selected_figures)
 	}
 
@@ -95,18 +92,21 @@ update_figure_selection_tool :: proc() {
 			} else {
 				// Crear nueva figura
 				state = .Edit_Figure
-
-				center := to_world(game_state.camera, rl.GetMousePosition())
+				new_center := to_world(game_state.camera, rl.GetMousePosition())
 
 				ensure(len(figures) < MAX_FIGURES, "Maximum figures reached")
 				append(&figures, Regular_Figure {
-					center = center,
-					radius = center,
-					n = create_figure_ui.n_sides,
-					point_seg_index = 0,
-					point_progress = 0,
-					point_counter_start = create_figure_ui.counter,
-					point_counter = create_figure_ui.counter,
+					// Posición dada por el usuario
+					center = new_center,
+					radius = new_center,
+
+					// Características heredadas de la UI de creación
+					n                   = ui.creation_n_sides,
+					point_counter_start = ui.creation_counter,
+					point_counter       = ui.creation_counter,
+
+					// TODO: limitar el tamaño para que la frecuencia se
+					// mantenga razonable
 					frecuency = 60,
 				})
 
@@ -196,7 +196,6 @@ update_figure_selection_tool :: proc() {
 
 				} else if rl.IsKeyDown(.LEFT_SHIFT) {
 					// Borrar selección de antes
-					// TODO: debería estar vacía realmente
 					clear(&selected_figures)
 
 					// Añadir las figuras seleccionadas: la anterior y la nueva
@@ -406,8 +405,10 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 	// Cambiar de vértice
 	if fig.point_progress > 1.0 {
 		sound_to_play := game_state.music_notes[fig.notes[Music_Notes(fig.point_seg_index)]]
-		rl.SetSoundVolume(sound_to_play, f32(game_state.volume/10))
+		// TODO: mover a UI
+		rl.SetSoundVolume(sound_to_play, f32(game_state.ui.volume/10))
 		rl.PlaySound(sound_to_play)
+
 		fig.point_progress = 0.0
 		fig.point_seg_index += 1
 
@@ -440,31 +441,7 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 		return
 	}
 
-	if fig.n == 2 {
-		// TODO: dibujar hasta y desde el círculo central, pero no atravesarlo
-		point1 := to_screen(camera, fig.center + diff)
-		point2 := to_screen(camera, fig.center - diff)
-
-		rl.DrawLine(
-			c.int(point1.x), c.int(point1.y),
-			c.int(point2.x), c.int(point2.y),
-			color,
-		)
-	} else {
-		rotation := m.atan(diff.y / diff.x) * m.DEG_PER_RAD
-
-		// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
-		if diff.x >= 0 do rotation += 180
-
-		rl.DrawPolyLines(
-			center = screen_center,
-			sides = c.int(fig.n),
-			radius = screen_radius,
-			rotation = rotation,
-			color = color,
-		)
-	}
-
+	// Dibujar círculo de selección + indicador del contador
 	if screen_radius > FIGURE_MIN_RADIUS {
 		// Dibujar el "handle" que permite seleccionar y mover la figura
 		c_screen_center := iv2 {c.int(screen_center.x), c.int(screen_center.y)}
@@ -481,6 +458,63 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 			c_screen_center.x, c_screen_center.y,
 			UI_FONT_SIZE,
 			color,
+		)
+
+		// Dibujar línea teniendo en cuenta el círculo de selección para que no
+		// se crucen las líneas
+		if fig.n == 2 {
+			screen_diff := to_screen(camera, diff)
+
+			// Vector que apunta al círculo de selección
+			screen_selector := m.normalize0(screen_diff) * FIGURE_SELECTOR_SIZE
+
+			// Los puntos alejados del centro
+			out1 := screen_center - screen_diff // = to_screen(camera, fig.radius)
+			out2 := screen_center + screen_diff
+
+			// Los puntos que están en la circunferencia de la selección
+			in1 := screen_center - screen_selector
+			in2 := screen_center + screen_selector
+
+			rl.DrawLine(
+				c.int(out1.x), c.int(out1.y),
+				c.int(in1.x), c.int(in1.y),
+				color,
+			)
+
+			rl.DrawLine(
+				c.int(out2.x), c.int(out2.y),
+				c.int(in2.x), c.int(in2.y),
+				color,
+			)
+		}
+	} else if fig.n == 2 {
+		// Si no hay círculo de selección y es una línea, dibujarla completa
+		screen_diff := to_screen(camera, diff)
+		point1 := screen_center - screen_diff // = to_screen(camera, fig.radius)
+		point2 := screen_center + screen_diff
+
+		rl.DrawLine(
+			c.int(point1.x), c.int(point1.y),
+			c.int(point2.x), c.int(point2.y),
+			color,
+		)
+	}
+
+	// Si la figura no es una línea, dibujar normal, tenga o no círculo de
+	// selección
+	if fig.n != 2 {
+		rotation := m.atan(diff.y / diff.x) * m.DEG_PER_RAD
+
+		// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
+		if diff.x >= 0 do rotation += 180
+
+		rl.DrawPolyLines(
+			center = screen_center,
+			sides = c.int(fig.n),
+			radius = screen_radius,
+			rotation = rotation,
+			color = color,
 		)
 	}
 
@@ -565,7 +599,7 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color 
 
 	// Cambiar los colores si el contador llegó a 0 o si la figura anterior
 	// tiene INF
-	if fade && (fig.point_counter == 0 || (fig.previous_figure != nil && fig.previous_figure.point_counter == -1)) {
+	if fade && (fig.point_counter == 0 || (fig.previous_figure != nil && fig.previous_figure.point_counter == COUNTER_INF)) {
 		// TODO: con los colores aleatorios no se entiende que esto sea un fade
 		color = {
 			u8(f32(color.r) * 0.6),
@@ -806,11 +840,6 @@ select_figure :: proc() -> (selected: ^Regular_Figure) {
 // distancia d en screen space
 @(private="file")
 is_figure_big_enough :: #force_inline proc "contextless" (fig: Regular_Figure) -> bool {
-	// screen_center := to_screen(game_state.camera, fig.center)
-	// screen_radius := to_screen(game_state.camera, fig.radius)
-	// return m.vector_length2(screen_center - screen_radius) > FIGURE_MIN_RADIUS * FIGURE_MIN_RADIUS
-
-	// TODO: checkear si se hace así directamente funciona
 	diff := to_screen(game_state.camera, fig.center - fig.radius)
 	return m.vector_length2(diff) > FIGURE_MIN_RADIUS * FIGURE_MIN_RADIUS
 }
