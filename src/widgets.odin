@@ -1,10 +1,12 @@
 package game
 
 import rl "vendor:raylib"
+import "core:log"
 
 // ==== Labels ====
 LABEL_FONT_SIZE :: 12
 LABEL_COLOR     :: color { 255, 255, 255, 255 }
+LABEL_SPACING   :: 2
 
 // ==== Panel ====
 PANEL_HEADER_PADDING :: 2.0
@@ -16,7 +18,6 @@ PANEL_LABEL_COLOR  :: LABEL_COLOR
 
 // ==== Botones ====
 BUTTON_BORDER_SIZE :: 3.0
-BUTTON_PADDING     :: 10.0
 
 // Por defecto se usan estos colores
 BUTTON_COLOR        :: color { 255, 255, 255, 255 }
@@ -58,13 +59,16 @@ widget_panel :: proc(size: rect, name: cstring) {
 	rl.DrawRectangleLinesEx(size, PANEL_BORDER_SIZE, PANEL_BORDER_COLOR)
 
 	// Texto de cabecera
-	rl.DrawTextEx(
-		font = game_state.ui.font,
+	widget_label(
+		position = {
+			header.x + PANEL_HEADER_PADDING + PANEL_BORDER_SIZE,
+			header.y + PANEL_HEADER_PADDING + PANEL_BORDER_SIZE,
+			header.width  - 2 * PANEL_BORDER_SIZE,
+			header.height - 2 * PANEL_BORDER_SIZE,
+		},
 		text = name,
-		position = v2 { size.x + PANEL_HEADER_PADDING + PANEL_BORDER_SIZE, size.y + PANEL_HEADER_PADDING + PANEL_BORDER_SIZE },
-		fontSize = LABEL_FONT_SIZE,
-		spacing = 1,
-		tint = PANEL_LABEL_COLOR,
+		color = PANEL_LABEL_COLOR,
+		hcenter = true,
 	)
 
 }
@@ -106,16 +110,19 @@ widget_button :: proc(
 	rl.DrawRectangleRec(size, background_color)
 	// Borde
 	rl.DrawRectangleLinesEx(size, BUTTON_BORDER_SIZE, border_color)
-	rl.DrawTextEx(
-		font = game_state.ui.font,
+	// Texto
+	widget_label(
+		position = {
+			size.x + BUTTON_BORDER_SIZE,
+			size.y + BUTTON_BORDER_SIZE,
+			size.width  - 2 * BUTTON_BORDER_SIZE,
+			size.height - 2 * BUTTON_BORDER_SIZE,
+		},
 		text = text,
-		position = v2 { size.x + BUTTON_PADDING + BUTTON_BORDER_SIZE, size.y + BUTTON_PADDING + BUTTON_BORDER_SIZE },
-		fontSize = LABEL_FONT_SIZE,
-		spacing = 1,
-		tint = text_color,
+		color = text_color,
+		hcenter = true,
 	)
 
-	// TODO: implementar
 	return click && hover
 }
 
@@ -123,16 +130,44 @@ widget_label :: proc(
 	position: rect,
 	text: cstring,
 	color := LABEL_COLOR,
+	hcenter := false,
 ) {
-	// TODO: usar ancho también para cortar el tamaño
+	// TODO: Cortar cuando se sale del tamaño dado?
+	// BUG: esto devuelve 0
+	text_size := rl.MeasureTextEx(
+		font = game_state.ui.font,
+		text = text,
+		fontSize = LABEL_FONT_SIZE,
+		spacing = LABEL_SPACING,
+	)
+
+	// HACK: esto es un apaño, pero tampoco funciona
+	if text_size.x == 0 {
+		// Asume proporción de cada letra 2 (alto) : 1 (ancho)
+		text_size.x = f32(len(text)) * LABEL_FONT_SIZE/2
+	}
+	if text_size.y == 0 {
+		text_size.y = LABEL_FONT_SIZE
+	}
+
+	// Centrar horizontalmente
+	text_x := position.x
+	if hcenter {
+		text_x += position.width / 2 - text_size.x / 2
+	}
+
+	// Centrar verticalmente
+	text_y := position.y + position.height / 2 - text_size.y / 2
+
 	rl.DrawTextEx(
 		font = game_state.ui.font,
 		text = text,
-		position = v2 { position.x, position.y },
+		position = v2 { text_x, text_y },
 		fontSize = LABEL_FONT_SIZE,
-		spacing = 1,
-		tint = LABEL_COLOR,
+		spacing = LABEL_SPACING,
+		tint = color,
 	)
 }
 
 widget_text_box :: proc(state: ^Text_Box) {}
+

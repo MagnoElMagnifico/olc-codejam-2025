@@ -100,8 +100,11 @@ init :: proc() {
 	camera.zoom = 1.0
 	window_size = WINDOW_SIZE
 
-	// TODO: usar otra fuente
-	ui.font = rl.GetFontDefault()
+	// BUG: no carga la fuente: no hay errores pero se sigue usando la fuente
+	// por defecto. Tampoco con "assets/Ubuntu-Regular.ttf".
+	ui.font = rl.LoadFontEx("assets/Roboto-Regular.ttf", 32, nil, 0)
+	ensure(rl.IsFontValid(ui.font), "Invalid UI font")
+
 	ui.creation_n_sides = 3
 	ui.creation_counter = -1
 	ui.volume = 10
@@ -318,6 +321,8 @@ shutdown :: proc() {
 		rl.UnloadSound(music_note)
 	}
 	rl.CloseAudioDevice()
+
+	rl.UnloadFont(game_state.ui.font)
 	rl.CloseWindow()
 }
 

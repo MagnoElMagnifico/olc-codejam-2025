@@ -44,7 +44,7 @@ UI_State :: struct {
 
 update_ui_dimensions :: proc() {
 	PANEL_TOOLBOX_WIDTH :: 3 * UI_BUTTON_SIZE + 4 * UI_PADDING
-    PANEL_FIGURE_WIDTH :: /* text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
+	PANEL_FIGURE_WIDTH :: /* text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
 
 	game_state.ui.panel_toolbox = rect {
 		x = f32(game_state.window_size.x) / 2 - PANEL_TOOLBOX_WIDTH / 2,
