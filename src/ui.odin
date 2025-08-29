@@ -326,20 +326,15 @@ render_figure_ui :: proc() {
 	// BPM config
 	{
 		if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
-		append(&bpm_text,54) //60 es el valor inicial
-		append(&bpm_text,48)
-		append(&bpm_text,0)
-		char_count = 2
-	}
-
-
+			append(&bpm_text,48)
+			append(&bpm_text,0)
+			char_count = 1
+		}
 
 	buf: [32]u8;
     str := strconv.itoa(buf[:], int(f32(game_state.current_figure.frecuency * 60)));
-	if int(f32(game_state.current_figure.frecuency * 60)) != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
-		log.info(int(f32(game_state.current_figure.frecuency) * f32(60)), "?=",strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))))
+	if !mouse_on_text && int(f32(game_state.current_figure.frecuency * 60)) != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
 		for len(bpm_text) > 1{
-			log.info(bpm_text)
 			char_count -= 1
 			if char_count < 0 {
 				char_count = 0
@@ -348,14 +343,12 @@ render_figure_ui :: proc() {
 				bpm_text[char_count] = 0 // null terminator
 			}
 		}
-		log.info(bpm_text,"prebpm")
 		for c in str{
 			append(&bpm_text, 0)               // null terminator
 			bpm_text[char_count] = u8(c)          // añadir char
 			char_count += 1
 		}
 
-		log.info(bpm_text,"postbpm")
 	}
 
 		{
@@ -388,20 +381,16 @@ render_figure_ui :: proc() {
 			if mouse_on_text {
 				value := rl.GetCharPressed()
 				for value > 0 {
-					log.info("pressed: ", value)
 					if (value >= '0') && (value <= '9') && (char_count < 3) {
 						append(&bpm_text, 0)               // null terminator
 						
 						bpm_text[char_count] = u8(value)          // store character
 						char_count += 1
 						input_bmp, _ := strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
-						log.info("now bpm_text is", input_bmp)
 						game_state.current_figure.frecuency = f32(input_bmp) / f32(60.0)
-						log.info("now freq is", game_state.current_figure.frecuency)
 						update_figure_radius(game_state.current_figure)
 					}
 					value = rl.GetCharPressed()
-					
 				}
 
 				if rl.IsKeyPressed(.BACKSPACE) {
@@ -413,9 +402,7 @@ render_figure_ui :: proc() {
 						bpm_text[char_count] = 0 // null terminator
 					}
 					input_bmp, _ := strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
-					log.info("now bpm_text is", input_bmp)
 					game_state.current_figure.frecuency = f32(input_bmp) / f32(60.0)
-					log.info("now freq is", game_state.current_figure.frecuency)
 					update_figure_radius(game_state.current_figure)
 				}
 			}
@@ -538,7 +525,7 @@ render_debug_info :: proc() {
 	)
 }
 
-check_backspace_action :: proc() -> int{
+check_bpm_text_action :: proc() -> int{
 	if mouse_on_text {
 		return 0
 	}else{

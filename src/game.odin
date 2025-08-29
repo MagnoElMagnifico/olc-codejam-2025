@@ -166,7 +166,7 @@ update :: proc() {
 		game_state.simulation_running = !game_state.simulation_running
 	}
 
-	{
+	when false{
 		tool_changed := false
 		if rl.IsKeyPressed(.ZERO) {
 			game_state.tool = .View
@@ -204,7 +204,7 @@ update :: proc() {
 				game_state.state = .View
 			}
 
-			if rl.IsKeyPressed(.BACKSPACE) && check_backspace_action() == 1 || rl.IsKeyPressed(.DELETE) {
+			if rl.IsKeyPressed(.BACKSPACE) && check_bpm_text_action() == 1 || rl.IsKeyPressed(.DELETE) {
 				if game_state.current_figure != nil do delete_current_figure()
 				else if game_state.state == .Multiselection do delete_multiselected_figures()
 			}

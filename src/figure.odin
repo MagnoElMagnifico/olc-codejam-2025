@@ -326,7 +326,7 @@ update_figure_link_tool :: proc() {
 	// ==== Primer paso: seleccionar una figura ====
 
 	// Si se hizo click en otro lado, cancelar la selección
-	if select_figure == nil {
+	if selected == nil {
 		current_figure = nil
 		return
 	}
@@ -903,9 +903,9 @@ update_figure_frecuency :: #force_inline proc "contextless" (fig: ^Regular_Figur
 // determinar qué radio tendría que tener
 update_figure_radius :: #force_inline proc "contextless" (fig: ^Regular_Figure) {
 	if fig.frecuency <= 0 {
-		return
+		fig.frecuency = 1
 	}
-	side := fig.frecuency / POINT_SPEED
+	side :=  POINT_SPEED / fig.frecuency
 
 	// Teníamos de antes:
 	//
@@ -935,7 +935,6 @@ update_figure_radius :: #force_inline proc "contextless" (fig: ^Regular_Figure) 
 	//    radio = lado / (2 * sen(angulo))
 	//
 	radius := side / (2 * m.sin(m.PI / f32(fig.n)))
-
 	// Ahora calcular un nuevo fig.radius que mantenga la misma orientación y
 	// cumpla:
 	//
@@ -944,5 +943,5 @@ update_figure_radius :: #force_inline proc "contextless" (fig: ^Regular_Figure) 
 	// Para ello, tomar un vector unitario con el mismo sentido y orientación y
 	// escalarlo para que tenga justo ese radio.
 	diff := m.normalize0(fig.center - fig.radius)
-	fig.radius = fig.center + diff * radius
+	fig.radius = fig.center - diff * radius
 }
