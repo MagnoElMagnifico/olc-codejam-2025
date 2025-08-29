@@ -11,9 +11,23 @@ The theme for this Jam was **shapes**.
 Run the specific files for your platform:
 
 - Windows Desktop: `build_desktop.bat`
-- Windows Web: `build_web.bat`
 - Linux Desktop: `build_desktop.sh`
-- Linux Web: `build_web.sh`
+- Windows Web: `build_web.bat` (you need [Emscripten] installed, add location to the script)
+- Linux Web: `build_web.sh` (you need [Emscripten] installed, add location to the script)
+
+Note that for desktop, essentially just run the Odin Compiler:
+
+```bash
+odin build src/main_desktop -out:synth_shapes.exe
+
+```
+
+The executable needs to be next to the `assets` directory, so if you want to
+distribute the binaries, remember to copy it as well (this is what the script
+does).
+
+Tested with the Odin Compiler version `dev-2025-08-nightly` and Emscripten
+`4.0.13`.
 
 # How to use
 
@@ -54,6 +68,7 @@ the camera around.
 - [Raylib Examples](https://www.raylib.com/examples.html)
 - [Raylib Cheatsheet](https://www.raylib.com/cheatsheet/cheatsheet.html)
 
+[Emscripten]: https://emscripten.org/
 [OLC CodeJam 2025]: https://itch.io/jam/olc-codejam-2025
 [Odin Programming Language]: https://odin-lang.org/
 [Web Odin Template]: https://github.com/karl-zylinski/odin-raylib-web

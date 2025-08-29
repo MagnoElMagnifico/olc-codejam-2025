@@ -5,6 +5,7 @@ package game
 import rl "vendor:raylib"
 import "core:c"
 import "core:log"
+import "core:math/rand"
 
 // Definiciones de tipos comunes (por comodidad)
 iv2 :: [2]c.int
@@ -20,7 +21,7 @@ MAX_FIGURES :: 10 when ODIN_DEBUG else 1024
 Music_Notes :: enum u8 {
 	// TODO: Añadir más notas?
 	// TODO: hacer Null = 0 para que sea la nota por defecto?
-	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep, Null
+	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep, Null,
 }
 
 @(rodata)
@@ -37,7 +38,7 @@ STRING_NOTES := [Music_Notes]cstring {
 	.Si = "Si",
 	.Dop = "Dop",
 	.Rep = "Rep",
-	.Null = "---"
+	.Null = "---",
 }
 
 // ==== GAME DATA =============================================================
@@ -68,7 +69,7 @@ Game_State :: struct {
 	window_size: iv2,
 
 	// ==== Resources ====
-	music_notes: [Music_Notes]rl.Sound
+	music_notes: [Music_Notes]rl.Sound,
 }
 
 Selection_State :: enum {
@@ -89,9 +90,6 @@ Tools :: enum {
 }
 
 // ==== GAME INIT =============================================================
-
-import "core:os"
-import "core:math/rand"
 
 init :: proc() {
 	using game_state
