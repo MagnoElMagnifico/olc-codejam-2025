@@ -902,6 +902,9 @@ update_figure_frecuency :: #force_inline proc "contextless" (fig: ^Regular_Figur
 // Operación inversa de la función anterior: usa su campo de frecuencia para
 // determinar qué radio tendría que tener
 update_figure_radius :: #force_inline proc "contextless" (fig: ^Regular_Figure) {
+	if fig.frecuency <= 0 {
+		return
+	}
 	side := fig.frecuency / POINT_SPEED
 
 	// Teníamos de antes:

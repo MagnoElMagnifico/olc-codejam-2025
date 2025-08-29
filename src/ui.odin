@@ -324,17 +324,22 @@ render_figure_ui :: proc() {
 	}
 	
 	// BPM config
-
-	bpm := int(game_state.current_figure.frecuency * 60)
-	if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
-		append(&bpm_text,49) //60 es el valor inicial
+	{
+		if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
+		append(&bpm_text,54) //60 es el valor inicial
+		append(&bpm_text,48)
 		append(&bpm_text,0)
+		char_count = 2
 	}
 
+
+
 	buf: [32]u8;
-    str := strconv.itoa(buf[:], bpm);
-	if bpm != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
+    str := strconv.itoa(buf[:], int(f32(game_state.current_figure.frecuency * 60)));
+	if int(f32(game_state.current_figure.frecuency * 60)) != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
+		log.info(int(f32(game_state.current_figure.frecuency) * f32(60)), "?=",strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))))
 		for len(bpm_text) > 1{
+			log.info(bpm_text)
 			char_count -= 1
 			if char_count < 0 {
 				char_count = 0
@@ -343,83 +348,93 @@ render_figure_ui :: proc() {
 				bpm_text[char_count] = 0 // null terminator
 			}
 		}
-
+		log.info(bpm_text,"prebpm")
 		for c in str{
 			append(&bpm_text, 0)               // null terminator
 			bpm_text[char_count] = u8(c)          // añadir char
 			char_count += 1
 		}
+
+		log.info(bpm_text,"postbpm")
 	}
 
-	{
-		if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
-			append(&bpm_text, 0)
-		}
-
-		if (rl.CheckCollisionPointRec(rl.GetMousePosition(), textBox)) {
-			rl.SetMouseCursor(rl.MouseCursor.IBEAM)
-			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
-				mouse_on_text = true
+		{
+			if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
+				append(&bpm_text, 0)
 			}
-		} else {
-			rl.SetMouseCursor(rl.MouseCursor.DEFAULT)
-			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
-				mouse_on_text = false
-				if strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))) < 1 {
+
+			if (rl.CheckCollisionPointRec(rl.GetMousePosition(), textBox)) {
+				rl.SetMouseCursor(rl.MouseCursor.IBEAM)
+				if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+					mouse_on_text = true
+				}
+			} else {
+				rl.SetMouseCursor(rl.MouseCursor.DEFAULT)
+				if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+					mouse_on_text = false
+					if strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))) < 1 {
+						char_count -= 1
+						if char_count < 0 {
+							char_count = 0
+						} else {
+							pop(&bpm_text) // quitar valor < 1
+						}
+						append(&bpm_text, 0) // null terminator
+						bpm_text[char_count] = 49 //añadir el 1
+						char_count += 1
+					}
+				}
+			}
+			if mouse_on_text {
+				value := rl.GetCharPressed()
+				for value > 0 {
+					log.info("pressed: ", value)
+					if (value >= '0') && (value <= '9') && (char_count < 3) {
+						append(&bpm_text, 0)               // null terminator
+						
+						bpm_text[char_count] = u8(value)          // store character
+						char_count += 1
+						input_bmp, _ := strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
+						log.info("now bpm_text is", input_bmp)
+						game_state.current_figure.frecuency = f32(input_bmp) / f32(60.0)
+						log.info("now freq is", game_state.current_figure.frecuency)
+						update_figure_radius(game_state.current_figure)
+					}
+					value = rl.GetCharPressed()
+					
+				}
+
+				if rl.IsKeyPressed(.BACKSPACE) {
 					char_count -= 1
 					if char_count < 0 {
 						char_count = 0
 					} else {
-						pop(&bpm_text) // quitar valor < 1
+						pop(&bpm_text) // remove character
+						bpm_text[char_count] = 0 // null terminator
 					}
-					append(&bpm_text, 0) // null terminator
-					bpm_text[char_count] = 49 //añadir el 1
-					char_count += 1
+					input_bmp, _ := strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
+					log.info("now bpm_text is", input_bmp)
+					game_state.current_figure.frecuency = f32(input_bmp) / f32(60.0)
+					log.info("now freq is", game_state.current_figure.frecuency)
+					update_figure_radius(game_state.current_figure)
 				}
 			}
-		}
-		if mouse_on_text {
-			value := rl.GetCharPressed()
-			for value > 0 {
-				if (value >= '0') && (value <= '9') && (char_count < 3) {
-					append(&bpm_text, 0)               // null terminator
-					bpm_text[char_count] = u8(value)          // store character
-					char_count += 1
-				}
-				value = rl.GetCharPressed()
-			}
+			
+			rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Bpm:")
+			current_x += 100 + UI_PADDING
 
-			if rl.IsKeyPressed(.BACKSPACE) {
-				char_count -= 1
-				if char_count < 0 {
-					char_count = 0
-				} else {
-					pop(&bpm_text) // remove character
-					bpm_text[char_count] = 0 // null terminator
-				}
-			}
-		}
-		
-		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Bpm:")
-		current_x += 100 + UI_PADDING
+			rl.DrawRectangleRec(textBox, rl.DARKGRAY)
+			textBox = rl.Rectangle({current_x, current_y+8, 50, UI_LINE_HEIGHT - 15 })
+			current_x += UI_PADDING
 
-		rl.DrawRectangleRec(textBox, rl.DARKGRAY)
-		textBox = rl.Rectangle({current_x, current_y+8, 50, UI_LINE_HEIGHT - 15 })
-		current_x += UI_PADDING
+			rl.DrawText(cast(cstring) &bpm_text[0], i32(current_x), i32(current_y)+10, 5, rl.WHITE)
 
-		rl.DrawText(cast(cstring) &bpm_text[0], i32(current_x), i32(current_y)+10, 5, rl.WHITE)
-
-		// BUG: esto no se puede ejecutar cada frame, sino solo cuando se
-		// confirme el valor. De lo contrario, update_figure_radius() querrá
-		// cambiar el radio de la figura mientras el usuario quiere usar el
-		// ratón. Este if es solo un apaño.
-		if game_state.state != .Edit_Figure {
-			input_bmp, _ := strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
-			game_state.current_figure.frecuency = f32(input_bmp) / 60.0
-			update_figure_radius(game_state.current_figure)
+			// BUG: esto no se puede ejecutar cada frame, sino solo cuando se
+			// confirme el valor. De lo contrario, update_figure_radius() querrá
+			// cambiar el radio de la figura mientras el usuario quiere usar el
+			// ratón. Este if es solo un apaño.
 		}
 	}
-
 	current_x = UI_figure_panel_dim.x + UI_PADDING
 	current_y += UI_LINE_HEIGHT
 
