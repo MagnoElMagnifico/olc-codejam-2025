@@ -4,7 +4,6 @@ package game
 import rl "vendor:raylib"
 
 import "core:fmt"
-import "core:log"
 import "core:strconv"
 import "core:strings"
 
@@ -459,8 +458,8 @@ render_error_msg :: proc() {
 
 when ODIN_DEBUG {
 	render_debug_info :: proc() {
-		current_x : c.int = UI_MARGIN
-		current_y : c.int = game_state.window_size.y - 7 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
+		current_x : i32 = UI_MARGIN
+		current_y : i32 = game_state.window_size.y - 7 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
 
 		rl.DrawText(
 			fmt.caprintf("tool: %w", game_state.tool, allocator = context.temp_allocator),
