@@ -166,7 +166,7 @@ update :: proc() {
 		game_state.simulation_running = !game_state.simulation_running
 	}
 
-	when false{
+	{
 		tool_changed := false
 		if rl.IsKeyPressed(.ZERO) {
 			game_state.tool = .View
