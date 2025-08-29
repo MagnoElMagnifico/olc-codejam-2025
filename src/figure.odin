@@ -9,8 +9,6 @@ import "core:c"
 import "core:mem"
 import "core:log"
 import "core:slice/heap"
-import "base:runtime"
-import "core:fmt"
 
 // ==== CONSTANTS =============================================================
 
@@ -109,7 +107,7 @@ update_figure_selection_tool :: proc() {
 					point_progress = 0,
 					point_counter_start = create_figure_ui.counter,
 					point_counter = create_figure_ui.counter,
-					frecuency = 60
+					frecuency = 60,
 				})
 
 				current_figure = &figures[len(figures)-1]
@@ -223,7 +221,6 @@ update_figure_selection_tool :: proc() {
 		assert(current_figure == nil && len(selected_figures) != 0, "Modo .Multiselection requiere current_figure a nil y figuras en select_figures")
 
 		if rl.IsMouseButtonPressed(.LEFT) {
-			mouse := rl.GetMousePosition()
 			selected := select_figure()
 
 			if selected == nil {
@@ -286,7 +283,7 @@ update_figure_selection_tool :: proc() {
 			size := top - base
 
 			selection_rect = {
-				base.x, base.y, size.x, size.y
+				base.x, base.y, size.x, size.y,
 			}
 
 		} else if rl.IsMouseButtonReleased(.RIGHT) {
@@ -451,7 +448,7 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 		rl.DrawLine(
 			c.int(point1.x), c.int(point1.y),
 			c.int(point2.x), c.int(point2.y),
-			color
+			color,
 		)
 	} else {
 		rotation := m.atan(diff.y / diff.x) * m.DEG_PER_RAD
@@ -483,7 +480,7 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 			counter_str,
 			c_screen_center.x, c_screen_center.y,
 			UI_FONT_SIZE,
-			color
+			color,
 		)
 	}
 
@@ -541,17 +538,17 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 		rl.DrawLine(
 			c.int(start.x), c.int(start.y),
 			c.int(end.x), c.int(end.y),
-			color
+			color,
 		)
 		rl.DrawLine(
 			c.int(end.x), c.int(end.y),
 			c.int(arrow1.x), c.int(arrow1.y),
-			color
+			color,
 		)
 		rl.DrawLine(
 			c.int(end.x), c.int(end.y),
 			c.int(arrow2.x), c.int(arrow2.y),
-			color
+			color,
 		)
 	}
 }
@@ -628,7 +625,7 @@ delete_current_figure :: proc() {
 		current_figure != nil && (state == .Edit_Figure ||
 		state == .Selected_Figure ||
 		state == .Move_Figure),
-		"para borrar una figura, esta debe estar seleccionada"
+		"para borrar una figura, esta debe estar seleccionada",
 	)
 
 	// Borrar una figura causa que se reorganicen otras en el array, lo que
@@ -684,7 +681,7 @@ delete_multiselected_figures :: proc() {
 	using game_state
 	assert(
 		current_figure == nil && state == .Multiselection,
-		"No está en modo Multiselect"
+		"No está en modo Multiselect",
 	)
 
 	// No se pueden borrar directamente, porque eso rompe los punteros: al
@@ -709,7 +706,7 @@ delete_multiselected_figures :: proc() {
 	heap.make(indices[:], less)
 
 	// Y borrarlos por orden
-	for i in 0 ..< len(selected_figures) {
+	for _ in 0 ..< len(selected_figures) {
 		// No romper los links: ver explicación en `delete_current_figure`
 		current := &figures[indices[0]]
 		if current.previous_figure != nil do current.previous_figure.next_figure = nil

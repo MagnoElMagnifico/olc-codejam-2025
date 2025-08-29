@@ -3,7 +3,6 @@ package game
 // TODO: customizar estilos, se ve bastante como la caca
 import rl "vendor:raylib"
 
-import "core:c"
 import "core:fmt"
 import "core:log"
 import "core:strconv"
@@ -293,7 +292,7 @@ render_figure_ui :: proc() {
 
 		n: uint = 0
 
-		for note in 1..=game_state.current_figure.n {
+		for _ in 1..=game_state.current_figure.n {
 			// TODO: usar caprintf("Vertex %d\x00", n+1)? Así queda el texto más junto
 			rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Vertex")
 			rl.GuiLabel({current_x + 50, current_y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(n+1)))
@@ -331,8 +330,8 @@ render_figure_ui :: proc() {
 			char_count = 1
 		}
 
-	buf: [32]u8;
-    str := strconv.itoa(buf[:], int(f32(game_state.current_figure.frecuency * 60)));
+	buf: [32]u8
+	str := strconv.itoa(buf[:], int(f32(game_state.current_figure.frecuency * 60)))
 	if !mouse_on_text && int(f32(game_state.current_figure.frecuency * 60)) != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
 		for len(bpm_text) > 1{
 			char_count -= 1
@@ -458,71 +457,73 @@ render_error_msg :: proc() {
 	rl.DrawText(error_message, pos_x, pos_y, UI_FONT_SIZE, UI_ERROR_MSG_COLOR)
 }
 
-render_debug_info :: proc() {
-	current_x : c.int = UI_MARGIN
-	current_y : c.int = game_state.window_size.y - 7 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
+when ODIN_DEBUG {
+	render_debug_info :: proc() {
+		current_x : c.int = UI_MARGIN
+		current_y : c.int = game_state.window_size.y - 7 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
 
-	rl.DrawText(
-		fmt.caprintf("tool: %w", game_state.tool, allocator = context.temp_allocator),
-		current_x, current_y,
-		UI_FONT_SIZE,
-		rl.WHITE
-	)
-	current_y += UI_FONT_SIZE + UI_PADDING/2
+		rl.DrawText(
+			fmt.caprintf("tool: %w", game_state.tool, allocator = context.temp_allocator),
+			current_x, current_y,
+			UI_FONT_SIZE,
+			rl.WHITE,
+		)
+		current_y += UI_FONT_SIZE + UI_PADDING/2
 
-	rl.DrawText(
-		fmt.caprintf("selection: %w", game_state.state, allocator = context.temp_allocator),
-		current_x, current_y,
-		UI_FONT_SIZE,
-		rl.WHITE
-	)
-	current_y += UI_FONT_SIZE + UI_PADDING/2
+		rl.DrawText(
+			fmt.caprintf("selection: %w", game_state.state, allocator = context.temp_allocator),
+			current_x, current_y,
+			UI_FONT_SIZE,
+			rl.WHITE,
+		)
+		current_y += UI_FONT_SIZE + UI_PADDING/2
 
-	rl.DrawText(
-		fmt.caprintf("frame time: %1.5f", rl.GetFrameTime(), allocator = context.temp_allocator),
-		current_x, current_y,
-		UI_FONT_SIZE,
-		rl.WHITE
-	)
-	current_y += UI_FONT_SIZE + UI_PADDING/2
+		rl.DrawText(
+			fmt.caprintf("frame time: %1.5f", rl.GetFrameTime(), allocator = context.temp_allocator),
+			current_x, current_y,
+			UI_FONT_SIZE,
+			rl.WHITE,
+		)
+		current_y += UI_FONT_SIZE + UI_PADDING/2
 
-	rl.DrawText(
-		fmt.caprintf("simulation: %w", game_state.simulation_running, allocator = context.temp_allocator),
-		current_x, current_y,
-		UI_FONT_SIZE,
-		rl.WHITE
-	)
-	current_y += UI_FONT_SIZE + UI_PADDING/2
+		rl.DrawText(
+			fmt.caprintf("simulation: %w", game_state.simulation_running, allocator = context.temp_allocator),
+			current_x, current_y,
+			UI_FONT_SIZE,
+			rl.WHITE,
+		)
+		current_y += UI_FONT_SIZE + UI_PADDING/2
 
-	rl.DrawText(
-		fmt.caprintf("zoom: %1.5f", game_state.camera.zoom, allocator = context.temp_allocator),
-		current_x, current_y,
-		UI_FONT_SIZE,
-		rl.WHITE
-	)
-	current_y += UI_FONT_SIZE + UI_PADDING/2
+		rl.DrawText(
+			fmt.caprintf("zoom: %1.5f", game_state.camera.zoom, allocator = context.temp_allocator),
+			current_x, current_y,
+			UI_FONT_SIZE,
+			rl.WHITE,
+		)
+		current_y += UI_FONT_SIZE + UI_PADDING/2
 
-	rl.DrawText(
-		fmt.caprintf("figures len: %d, figures cap: %d", len(game_state.figures), cap(game_state.figures), allocator = context.temp_allocator),
-		current_x, current_y,
-		UI_FONT_SIZE,
-		rl.WHITE
-	)
-	current_y += UI_FONT_SIZE + UI_PADDING/2
+		rl.DrawText(
+			fmt.caprintf("figures len: %d, figures cap: %d", len(game_state.figures), cap(game_state.figures), allocator = context.temp_allocator),
+			current_x, current_y,
+			UI_FONT_SIZE,
+			rl.WHITE,
+		)
+		current_y += UI_FONT_SIZE + UI_PADDING/2
 
-	n_selected := 0
-	if game_state.state == .Multiselection {
-		n_selected = len(game_state.selected_figures)
-	} else if game_state.current_figure != nil {
-		n_selected = 1
+		n_selected := 0
+		if game_state.state == .Multiselection {
+			n_selected = len(game_state.selected_figures)
+		} else if game_state.current_figure != nil {
+			n_selected = 1
+		}
+
+		rl.DrawText(
+			fmt.caprintf("figures selected: %d", n_selected, allocator = context.temp_allocator),
+			current_x, current_y,
+			UI_FONT_SIZE,
+			rl.WHITE,
+		)
 	}
-
-	rl.DrawText(
-		fmt.caprintf("figures selected: %d", n_selected, allocator = context.temp_allocator),
-		current_x, current_y,
-		UI_FONT_SIZE,
-		rl.WHITE
-	)
 }
 
 check_bpm_text_action :: proc() -> int{
