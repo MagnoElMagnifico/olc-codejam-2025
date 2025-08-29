@@ -296,6 +296,10 @@ update :: proc() {
 // In a web build, this is called when browser changes size. Remove
 // the `rl.SetWindowSize` call if you don't want a resizable game.
 parent_window_size_changed :: proc(w, h: c.int) {
+	if game_state.window_size == (iv2 {w, h}) {
+		return
+	}
+
 	game_state.window_size = {w, h}
 	update_ui_dimensions()
 

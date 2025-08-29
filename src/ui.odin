@@ -1,6 +1,5 @@
 package game
 
-// TODO: customizar estilos, se ve bastante como la caca
 import rl "vendor:raylib"
 
 import "core:fmt"
@@ -17,16 +16,54 @@ UI_ERROR_MSG_TIME  :: 5.0 // s
 UI_ERROR_MSG_COLOR :: rl.RED
 
 // Tamaño del panel UI para dar a raylib
-UI_PANEL_DIM :: rect {
-	UI_MARGIN, UI_MARGIN,
-	/* MAX ANCHO: text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40,
-	/* ALTO: cabecera + 4 filas + padding final */ 6 * UI_LINE_HEIGHT + UI_PADDING,
-}
+
 
 // Se usa para determinar las propiedades de nuevas figuras
-UI_Create_State :: struct {
-	n_sides: uint,
-	counter: int,
+UI_State :: struct {
+	// Panel de herramientas
+	volume: f32,
+	// La herramienta seleccionada actual está en game_state.tool
+
+	// Panel de creación de nuevas figuras
+	creation_n_sides: uint,
+	creation_counter: int,
+
+	// Dimensiones de los paneles que no sean constantes
+	panel_toolbox: rect, // Este sí es constante creo
+	panel_create_figure: rect,
+	panel_figure: rect,
+
+	// Mensajes al usuario
+	error_message: cstring,
+	error_needs_free: bool, // Innecesario por el momento
+	error_timer: f32,
+}
+
+
+update_ui_dimensions :: proc() {
+	PANEL_TOOLBOX_WIDTH :: 3 * UI_BUTTON_SIZE + 4 * UI_PADDING
+    PANEL_FIGURE_WIDTH :: /* text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
+
+	game_state.ui.panel_toolbox = rect {
+		x = f32(game_state.window_size.x) / 2 - PANEL_TOOLBOX_WIDTH / 2,
+		y = UI_MARGIN,
+		width = PANEL_TOOLBOX_WIDTH,
+		height = UI_LINE_HEIGHT,
+	}
+
+	game_state.ui.panel_create_figure = rect {
+		x = UI_MARGIN,
+		y = UI_MARGIN,
+		width = PANEL_FIGURE_WIDTH,
+		height = /* header + 2 rows + padding */ 3 * UI_LINE_HEIGHT + UI_PADDING,
+	}
+
+	game_state.ui.panel_figure = rect {
+		x = f32(game_state.window_size.x) - PANEL_FIGURE_WIDTH - UI_MARGIN,
+		y = UI_MARGIN,
+		width = PANEL_FIGURE_WIDTH,
+		height = 150, // Esto depende de la figura seleccionada
+	}
 }
 
 // TODO: mover todas las variables estáticas a game_state
@@ -35,31 +72,11 @@ char_count := 1
 textBox := rl.Rectangle({0, 0, 50, UI_LINE_HEIGHT - 15 })
 mouse_on_text := false
 
-UI_figure_panel_dim := rect {
-	0, UI_MARGIN,
-	// 150 + 3*UI_LINE_HEIGHT + 3*UI_PADDING,
-	/* MAX ANCHO: text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40,
-	150,
-}
-
-UI_toolbox_ui := rect {
-	0, UI_MARGIN,
-	3 * UI_BUTTON_SIZE + 4 * UI_PADDING,
-	UI_LINE_HEIGHT,
-}
-
-error_message: cstring
-error_message_count_down: f32
-
 render_toolbox_ui :: proc() {
-	UI_toolbox_ui.x = f32(game_state.window_size.x) / 2 - UI_toolbox_ui.width / 2
-
-	x := UI_toolbox_ui.x
-	y := UI_toolbox_ui.y
+	x := game_state.ui.panel_toolbox.x
+	y := game_state.ui.panel_toolbox.y
 
 	tool_changed := false
-
-	// TODO: resaltar botón con el modo seleccionado. Ni idea de cómo hacerlo
 
 	if rl.GuiButton({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "S") {
 		game_state.tool = .Select
@@ -85,69 +102,8 @@ render_toolbox_ui :: proc() {
 		game_state.state = .View
 		clear(&game_state.selected_figures)
 	}
-}
 
-render_create_figure_ui :: proc() {
-	using game_state.create_figure_ui
-
-	rl.GuiPanel(UI_PANEL_DIM, "Create figure")
-
-	// Posición inicial
-	current_x : f32 = UI_PANEL_DIM.x + UI_PADDING
-	current_y : f32 = UI_PANEL_DIM.y + /* saltar cabecera */ UI_LINE_HEIGHT
-
-	// Número de lados de la figura
-	{
-		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Sides:")
-		rl.GuiLabel({current_x + 50, current_y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(n_sides)))
-
-		// añadir el width del elemento y padding para el siguiente
-		current_x += 100 + UI_PADDING
-
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
-			n_sides = min(n_sides + 1, FIGURE_MAX_SIDES)
-		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
-
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
-			n_sides = max(n_sides - 1, 2)
-		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
-	}
-
-	current_x = UI_PADDING + UI_MARGIN
-	current_y += UI_LINE_HEIGHT
-
-	// Contador de la figura
-	{
-		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Counter:")
-		rl.GuiLabel({current_x + 50, current_y, 45, UI_LINE_HEIGHT}, cstr_from_int(counter))
-
-		// añadir el width del elemento y padding para el siguiente
-		current_x += 100 + UI_PADDING
-
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
-			counter = min(counter + 1, 100)
-		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
-
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") && counter != -1 {
-			counter = max(counter - 1, 0)
-		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
-
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, 40, UI_BUTTON_SIZE}, "inf") {
-			counter = -1
-		}
-	}
-
-	current_x = UI_PANEL_DIM.x + UI_PADDING
-	current_y += UI_LINE_HEIGHT
-
-	// TODO: esto modifica otras cosas, no realmente la creación de nuevas
-	// figuras. Mover a su propio panel?
-	// Nu se. A cuál lo quieres mover?
-
+	/*
 	// Sincronizar puntos
 	{
 		rl.GuiLabel({current_x, current_y, 80, UI_LINE_HEIGHT}, "Sync beat(s)")
@@ -223,6 +179,62 @@ render_create_figure_ui :: proc() {
 
 	current_x = UI_PADDING + UI_MARGIN
 	current_y += UI_LINE_HEIGHT
+	*/
+}
+
+render_create_figure_ui :: proc() {
+	using game_state.ui
+	rl.GuiPanel(panel_create_figure, "Create figure")
+
+	// Posición inicial
+	x : f32 = panel_create_figure.x + UI_PADDING
+	y : f32 = panel_create_figure.y + /* saltar cabecera */ UI_LINE_HEIGHT
+
+	// Número de lados de la figura
+	{
+		rl.GuiLabel({x,      y, 50, UI_LINE_HEIGHT}, "Sides:")
+		rl.GuiLabel({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(creation_n_sides)))
+		x += 100 + UI_PADDING
+
+		if rl.GuiButton({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
+			creation_n_sides = min(creation_n_sides + 1, FIGURE_MAX_SIDES)
+		}
+		x += UI_LINE_HEIGHT + UI_PADDING
+
+		if rl.GuiButton({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
+			creation_n_sides = max(creation_n_sides - 1, 2)
+		}
+		x += UI_LINE_HEIGHT + UI_PADDING
+	}
+
+	x = UI_PADDING + UI_MARGIN
+	y += UI_LINE_HEIGHT
+
+	// Contador de la figura
+	{
+		rl.GuiLabel({x,      y, 50, UI_LINE_HEIGHT}, "Counter:")
+		rl.GuiLabel({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(creation_counter))
+
+		// añadir el width del elemento y padding para el siguiente
+		x += 100 + UI_PADDING
+
+		if rl.GuiButton({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
+			creation_counter = min(creation_counter + 1, 100)
+		}
+		x += UI_LINE_HEIGHT + UI_PADDING
+
+		if rl.GuiButton({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") && creation_counter != COUNTER_INF {
+			creation_counter = max(creation_counter - 1, 0)
+		}
+		x += UI_LINE_HEIGHT + UI_PADDING
+
+		if rl.GuiButton({x, y+UI_PADDING/2, 40, UI_BUTTON_SIZE}, "inf") {
+			creation_counter = COUNTER_INF
+		}
+	}
+
+	x = panel_create_figure.x + UI_PADDING
+	y += UI_LINE_HEIGHT
 
 }
 
@@ -231,93 +243,89 @@ render_figure_ui :: proc() {
 		return
 	}
 
-	UI_figure_panel_dim.x = f32(game_state.window_size.x) - UI_figure_panel_dim.width - UI_MARGIN
-	rl.GuiPanel(UI_figure_panel_dim, "Figure Options")
+	rl.GuiPanel(game_state.ui.panel_figure, "Figure Options")
 
-	current_x : f32 = UI_figure_panel_dim.x + UI_PADDING
-	current_y : f32 = UI_figure_panel_dim.y + UI_LINE_HEIGHT
-
-	using game_state.current_figure
+	x := game_state.ui.panel_figure.x + UI_PADDING
+	y := game_state.ui.panel_figure.y + UI_LINE_HEIGHT
 
 	// Número de lados de la figura
 	{
-		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Sides:")
-		rl.GuiLabel({current_x + 50, current_y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(n)))
-		current_x += 100 + UI_PADDING
+		rl.GuiLabel({x,      y, 50, UI_LINE_HEIGHT}, "Sides:")
+		rl.GuiLabel({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(game_state.current_figure.n)))
+		x += 100 + UI_PADDING
 
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
-			n = min(n + 1, FIGURE_MAX_SIDES)
+		if rl.GuiButton({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
+			game_state.current_figure.n = min(game_state.current_figure.n + 1, FIGURE_MAX_SIDES)
 		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
+		x += UI_LINE_HEIGHT + UI_PADDING
 
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
-			n = max(n - 1, 2)
+		if rl.GuiButton({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
+			game_state.current_figure.n = max(game_state.current_figure.n - 1, 2)
 		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
+		x += UI_LINE_HEIGHT + UI_PADDING
 	}
 
-	current_x = UI_figure_panel_dim.x + UI_PADDING
-	current_y += UI_LINE_HEIGHT
+	x = game_state.ui.panel_figure.x + UI_PADDING
+	y += UI_LINE_HEIGHT
 
 	// Contador inicial de la figura
 	{
-		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Counter:")
-		rl.GuiLabel({current_x + 50, current_y, 45, UI_LINE_HEIGHT}, cstr_from_int(point_counter_start))
-		current_x += 100 + UI_PADDING
+		rl.GuiLabel({x, y, 50, UI_LINE_HEIGHT}, "Counter:")
+		rl.GuiLabel({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(game_state.current_figure.point_counter_start))
+		x += 100 + UI_PADDING
 
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
-			point_counter_start = min(point_counter_start + 1, 100)
+		if rl.GuiButton({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
+			game_state.current_figure.point_counter_start = min(game_state.current_figure.point_counter_start + 1, 100)
 		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
+		x += UI_LINE_HEIGHT + UI_PADDING
 
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") && point_counter_start != -1 {
-			point_counter_start = max(point_counter_start - 1, 0)
+		if rl.GuiButton({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") &&
+				game_state.current_figure.point_counter_start != COUNTER_INF {
+			game_state.current_figure.point_counter_start = max(game_state.current_figure.point_counter_start - 1, 0)
 		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
+		x += UI_LINE_HEIGHT + UI_PADDING
 
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, 40, UI_BUTTON_SIZE}, "inf") {
-			point_counter_start = -1
+		if rl.GuiButton({x, y+UI_PADDING/2, 40, UI_BUTTON_SIZE}, "inf") {
+			game_state.current_figure.point_counter_start = COUNTER_INF
 		}
 	}
 
-	current_x = UI_figure_panel_dim.x + UI_PADDING
-	current_y += UI_LINE_HEIGHT
+	x = game_state.ui.panel_figure.x + UI_PADDING
+	y += UI_LINE_HEIGHT
 
 	// Especificar las notas
 	{
-		rl.GuiLabel({current_x, current_y, 100, UI_LINE_HEIGHT}, "Sound Config:")
-		current_x = UI_figure_panel_dim.x + UI_PADDING
-		current_y += UI_LINE_HEIGHT
+		rl.GuiLabel({x, y, 100, UI_LINE_HEIGHT}, "Sound Config:")
+		y += UI_LINE_HEIGHT
 
-		n: uint = 0
+		for vertex_index in 0..<game_state.current_figure.n {
+			rl.GuiLabel(
+				{x, y, 50, UI_LINE_HEIGHT},
+				fmt.caprintf("Vertex %d", vertex_index + 1, allocator = context.temp_allocator),
+			)
+			x += 100 + UI_PADDING
 
-		for _ in 1..=game_state.current_figure.n {
-			// TODO: usar caprintf("Vertex %d\x00", n+1)? Así queda el texto más junto
-			rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Vertex")
-			rl.GuiLabel({current_x + 50, current_y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(n+1)))
-			current_x += 100 + UI_PADDING
-
-			if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
-				note_value := int(game_state.current_figure.notes[n])
+			if rl.GuiButton({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
+				note_value := int(game_state.current_figure.notes[vertex_index])
 				if note_value < 9 {
-					game_state.current_figure.notes[n] = Music_Notes(note_value+1)
+					game_state.current_figure.notes[vertex_index] = Music_Notes(note_value+1)
 				}
 			}
-			current_x += UI_LINE_HEIGHT + UI_PADDING
+			x += UI_LINE_HEIGHT + UI_PADDING
 
-			rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, STRING_NOTES[game_state.current_figure.notes[n]])
+			rl.GuiLabel({x, y, 50, UI_LINE_HEIGHT}, STRING_NOTES[game_state.current_figure.notes[vertex_index]])
 
-			current_x += UI_LINE_HEIGHT
+			x += UI_LINE_HEIGHT
 
-			if rl.GuiButton({current_x, current_y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") {
-				note_value := int(game_state.current_figure.notes[n])
+			if rl.GuiButton({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") {
+				note_value := int(game_state.current_figure.notes[vertex_index])
 				if note_value > 0 {
-					game_state.current_figure.notes[n] = Music_Notes(note_value-1)
+					game_state.current_figure.notes[vertex_index] = Music_Notes(note_value-1)
 				}
 			}
-			current_x = UI_figure_panel_dim.x + UI_PADDING
-			current_y += UI_LINE_HEIGHT
-			n += 1
+
+			x = game_state.ui.panel_figure.x + UI_PADDING
+			y += UI_LINE_HEIGHT
 		}
 	}
 	
@@ -329,25 +337,25 @@ render_figure_ui :: proc() {
 			char_count = 1
 		}
 
-	buf: [32]u8
-	str := strconv.itoa(buf[:], int(f32(game_state.current_figure.frecuency * 60)))
-	if !mouse_on_text && int(f32(game_state.current_figure.frecuency * 60)) != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
-		for len(bpm_text) > 1{
-			char_count -= 1
-			if char_count < 0 {
-				char_count = 0
-			}else{
-				pop(&bpm_text) // quitar char
-				bpm_text[char_count] = 0 // null terminator
+		buf: [32]u8
+		str := strconv.itoa(buf[:], int(f32(game_state.current_figure.frecuency * 60)))
+		if !mouse_on_text && int(f32(game_state.current_figure.frecuency * 60)) != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
+			for len(bpm_text) > 1{
+				char_count -= 1
+				if char_count < 0 {
+					char_count = 0
+				}else{
+					pop(&bpm_text) // quitar char
+					bpm_text[char_count] = 0 // null terminator
+				}
 			}
-		}
-		for c in str{
-			append(&bpm_text, 0)               // null terminator
-			bpm_text[char_count] = u8(c)          // añadir char
-			char_count += 1
-		}
+			for c in str{
+				append(&bpm_text, 0)               // null terminator
+				bpm_text[char_count] = u8(c)          // añadir char
+				char_count += 1
+			}
 
-	}
+		}
 
 		{
 			if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
@@ -381,7 +389,7 @@ render_figure_ui :: proc() {
 				for value > 0 {
 					if (value >= '0') && (value <= '9') && (char_count < 3) {
 						append(&bpm_text, 0)               // null terminator
-						
+
 						bpm_text[char_count] = u8(value)          // store character
 						char_count += 1
 						input_bmp, _ := strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
@@ -404,15 +412,15 @@ render_figure_ui :: proc() {
 					update_figure_radius(game_state.current_figure)
 				}
 			}
-			
-			rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Bpm:")
-			current_x += 100 + UI_PADDING
+
+			rl.GuiLabel({x, y, 50, UI_LINE_HEIGHT}, "Bpm:")
+			x += 100 + UI_PADDING
 
 			rl.DrawRectangleRec(textBox, rl.DARKGRAY)
-			textBox = rl.Rectangle({current_x, current_y+8, 50, UI_LINE_HEIGHT - 15 })
-			current_x += UI_PADDING
+			textBox = rl.Rectangle({x, y+8, 50, UI_LINE_HEIGHT - 15 })
+			x += UI_PADDING
 
-			rl.DrawText(cast(cstring) &bpm_text[0], i32(current_x), i32(current_y)+10, 5, rl.WHITE)
+			rl.DrawText(cast(cstring) &bpm_text[0], i32(x), i32(y)+10, 5, rl.WHITE)
 
 			// BUG: esto no se puede ejecutar cada frame, sino solo cuando se
 			// confirme el valor. De lo contrario, update_figure_radius() querrá
@@ -420,94 +428,95 @@ render_figure_ui :: proc() {
 			// ratón. Este if es solo un apaño.
 		}
 	}
-	current_x = UI_figure_panel_dim.x + UI_PADDING
-	current_y += UI_LINE_HEIGHT
+
+	x = game_state.ui.panel_figure.x + UI_PADDING
+	y += UI_LINE_HEIGHT
 
 	// Borrar figura
 	// WARN: debe estar al final de la función: si se borra la figura y el
 	// código siguiente usa game_state.current_figure, habrá un crash
 	{
-		rl.GuiLabel({current_x, current_y, 80, UI_LINE_HEIGHT}, "Delete")
-		current_x += 100 + UI_PADDING
+		rl.GuiLabel({x, y, 80, UI_LINE_HEIGHT}, "Delete")
+		x += 100 + UI_PADDING
 
-		if rl.GuiButton({current_x, current_y+UI_PADDING/2, 60, UI_BUTTON_SIZE}, "X") {
+		if rl.GuiButton({x, y+UI_PADDING/2, 60, UI_BUTTON_SIZE}, "X") {
 			delete_current_figure()
 		}
 	}
 
-	current_x = UI_figure_panel_dim.x + UI_PADDING
-	current_y += UI_LINE_HEIGHT
-	// TODO: no queda con el tamaño correcto, es un poco más grande
-	UI_figure_panel_dim.height = current_y
+	x = game_state.ui.panel_figure.x + UI_PADDING
+	y += UI_LINE_HEIGHT + UI_PADDING
+
+	game_state.ui.panel_figure.height = y - game_state.ui.panel_figure.y
 }
 
 set_error_msg :: proc(s: cstring) {
-	error_message = s
-	error_message_count_down = UI_ERROR_MSG_TIME
+	game_state.ui.error_message = s
+	game_state.ui.error_timer = UI_ERROR_MSG_TIME
 }
 
 render_error_msg :: proc() {
-	if error_message_count_down <= 0 do return
+	if game_state.ui.error_timer <= 0 do return
 
-	error_message_count_down -= rl.GetFrameTime()
-	width := rl.MeasureText(error_message, UI_FONT_SIZE)
+	game_state.ui.error_timer -= rl.GetFrameTime()
+	width := rl.MeasureText(game_state.ui.error_message, UI_FONT_SIZE)
 	pos_x := game_state.window_size.x - UI_MARGIN - width
 	pos_y := game_state.window_size.y - UI_MARGIN - UI_FONT_SIZE
-	rl.DrawText(error_message, pos_x, pos_y, UI_FONT_SIZE, UI_ERROR_MSG_COLOR)
+	rl.DrawText(game_state.ui.error_message, pos_x, pos_y, UI_FONT_SIZE, UI_ERROR_MSG_COLOR)
 }
 
 when ODIN_DEBUG {
 	render_debug_info :: proc() {
-		current_x : i32 = UI_MARGIN
-		current_y : i32 = game_state.window_size.y - 7 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
+		x : i32 = UI_MARGIN
+		y : i32 = game_state.window_size.y - 7 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
 
 		rl.DrawText(
 			fmt.caprintf("tool: %w", game_state.tool, allocator = context.temp_allocator),
-			current_x, current_y,
+			x, y,
 			UI_FONT_SIZE,
 			rl.WHITE,
 		)
-		current_y += UI_FONT_SIZE + UI_PADDING/2
+		y += UI_FONT_SIZE + UI_PADDING/2
 
 		rl.DrawText(
 			fmt.caprintf("selection: %w", game_state.state, allocator = context.temp_allocator),
-			current_x, current_y,
+			x, y,
 			UI_FONT_SIZE,
 			rl.WHITE,
 		)
-		current_y += UI_FONT_SIZE + UI_PADDING/2
+		y += UI_FONT_SIZE + UI_PADDING/2
 
 		rl.DrawText(
 			fmt.caprintf("frame time: %1.5f", rl.GetFrameTime(), allocator = context.temp_allocator),
-			current_x, current_y,
+			x, y,
 			UI_FONT_SIZE,
 			rl.WHITE,
 		)
-		current_y += UI_FONT_SIZE + UI_PADDING/2
+		y += UI_FONT_SIZE + UI_PADDING/2
 
 		rl.DrawText(
 			fmt.caprintf("simulation: %w", game_state.simulation_running, allocator = context.temp_allocator),
-			current_x, current_y,
+			x, y,
 			UI_FONT_SIZE,
 			rl.WHITE,
 		)
-		current_y += UI_FONT_SIZE + UI_PADDING/2
+		y += UI_FONT_SIZE + UI_PADDING/2
 
 		rl.DrawText(
 			fmt.caprintf("zoom: %1.5f", game_state.camera.zoom, allocator = context.temp_allocator),
-			current_x, current_y,
+			x, y,
 			UI_FONT_SIZE,
 			rl.WHITE,
 		)
-		current_y += UI_FONT_SIZE + UI_PADDING/2
+		y += UI_FONT_SIZE + UI_PADDING/2
 
 		rl.DrawText(
 			fmt.caprintf("figures len: %d, figures cap: %d", len(game_state.figures), cap(game_state.figures), allocator = context.temp_allocator),
-			current_x, current_y,
+			x, y,
 			UI_FONT_SIZE,
 			rl.WHITE,
 		)
-		current_y += UI_FONT_SIZE + UI_PADDING/2
+		y += UI_FONT_SIZE + UI_PADDING/2
 
 		n_selected := 0
 		if game_state.state == .Multiselection {
@@ -518,7 +527,7 @@ when ODIN_DEBUG {
 
 		rl.DrawText(
 			fmt.caprintf("figures selected: %d", n_selected, allocator = context.temp_allocator),
-			current_x, current_y,
+			x, y,
 			UI_FONT_SIZE,
 			rl.WHITE,
 		)
