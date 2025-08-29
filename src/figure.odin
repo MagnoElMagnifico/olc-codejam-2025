@@ -9,9 +9,12 @@ import "core:c"
 import "core:mem"
 import "core:log"
 import "core:slice/heap"
+import "base:runtime"
+import "core:fmt"
 
 // ==== CONSTANTS =============================================================
 
+POINT_SPEED          :: 200 // px/s
 FIGURE_MAX_SIDES     :: 25
 FIGURE_POINT_RADIUS  :: 5.0
 FIGURE_MIN_RADIUS    :: 35
@@ -32,7 +35,7 @@ Regular_Figure :: struct {
 	center: v2,
 	radius: v2,
 	n: uint,
-	bpm: uint,
+	frecuency: f32,
 	color_fig: rl.Color,
 
 	// Para los enlaces
@@ -106,7 +109,7 @@ update_figure_selection_tool :: proc() {
 					point_progress = 0,
 					point_counter_start = create_figure_ui.counter,
 					point_counter = create_figure_ui.counter,
-					bpm = 60
+					frecuency = 60
 				})
 
 				current_figure = &figures[len(figures)-1]
@@ -118,11 +121,12 @@ update_figure_selection_tool :: proc() {
 		assert(current_figure != nil && len(selected_figures) == 0, "Modo .New_Figure requiere una figura seleccionada")
 
 		if rl.IsMouseButtonDown(.LEFT) {
-			// TODO: para que sean números enteros, aquí hay que hacer
-			// cálculos para que coincida bien
 			current_figure.radius = to_world(camera, rl.GetMousePosition())
+			update_figure_frecuency(current_figure)
 
 		} else if !is_figure_big_enough(current_figure^) {
+			log.warn("es muy pequeña")
+
 			// Si la figura es muy pequeña, salir
 			// NOTE: se puede venir aquí si se selecciona una existente y se
 			// cambia de tamaño, por lo que esto puede que no lo queramos
@@ -390,32 +394,17 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 		return
 	}
 
+	// Técnicamente se puede calcular la frecuencia desde el radio y el número
+	// de lados, pero así es más rápido.
 	//
-	//     rl.GetFrameTime()
-	//
-	// Con esto se hace que todos los lados tarden en recorrerse aproximadamente
-	// un segundo (poco a poco va atrasando).
-	//
-	//     rl.GetFrameTime() * f32(fig.n)
-	//
-	// Lo anterior hace que cada ciclo dure ~1 segundo, por lo que a más
-	// vértices, mayor es la frecuencia. Esto también podría ser útil. El
-	// problema es que atrasa más rápido.
-	//
-	// Funciones de Odin con precisión de nanosegundos:
+	// Funciones de Odin con precisión de nanosegundos (por si raylib es
+	// demasiado poco preciso):
 	//
 	//     import core:time
 	//     time.now() -> Time
 	//     time.since(Time) -> Duration
 	//
-	// TODO: este método de interpolación provoca que todos los segmentos duren
-	// lo mismo. Puede que sea lo que queramos, y así evitamos tener que el
-	// usuario tenga que medir de forma precisa el perímetro o los lados
-	// Posible alternativa, calcular la longitud del lado y:
-	//     "tamaño de lado" (px) / "tiempo de frame" (seg) = velocidad
-	//
-	// TODO: Leer https://www.gamedeveloper.com/audio/coding-to-the-beat---under-the-hood-of-a-rhythm-game-in-unity
-	fig.point_progress += rl.GetFrameTime() * f32(fig.bpm) / 60
+	fig.point_progress += rl.GetFrameTime() * fig.frecuency
 
 	// Cambiar de vértice
 	if fig.point_progress > 1.0 {
@@ -820,9 +809,13 @@ select_figure :: proc() -> (selected: ^Regular_Figure) {
 // distancia d en screen space
 @(private="file")
 is_figure_big_enough :: #force_inline proc "contextless" (fig: Regular_Figure) -> bool {
-	screen_center := to_screen(game_state.camera, fig.center)
-	screen_radius := to_screen(game_state.camera, fig.radius)
-	return m.vector_length2(screen_center - screen_radius) > FIGURE_MIN_RADIUS * FIGURE_MIN_RADIUS
+	// screen_center := to_screen(game_state.camera, fig.center)
+	// screen_radius := to_screen(game_state.camera, fig.radius)
+	// return m.vector_length2(screen_center - screen_radius) > FIGURE_MIN_RADIUS * FIGURE_MIN_RADIUS
+
+	// TODO: checkear si se hace así directamente funciona
+	diff := to_screen(game_state.camera, fig.center - fig.radius)
+	return m.vector_length2(diff) > FIGURE_MIN_RADIUS * FIGURE_MIN_RADIUS
 }
 
 @(private="file")
@@ -830,4 +823,123 @@ vec_rotate :: #force_inline proc "contextless" (v: v2, angle: f32) -> (r: v2) {
 	r.x = v.x * m.cos(angle) - v.y * m.sin(angle)
 	r.y = v.x * m.sin(angle) + v.y * m.cos(angle)
 	return
+}
+
+@(private="file")
+update_figure_frecuency :: #force_inline proc "contextless" (fig: ^Regular_Figure) {
+	// Primero: calcular el lado de la figura.
+	//
+	// Se forma un triángulo entre el fig.center y de sus 2 vértices, en el que
+	// uno de sus lados es también un lado de la figura.
+	//
+	// Si sacamos una perpendicular de ese lado que pase por el centro,
+	// dividimos este triángulo en 2, creando otro triángulo rectángulo con
+	// los lados la perpendicular, mitad del lado de la figura y el radio
+	// (hipotenusa). Por Pitágoras:
+	//
+	//     perpendicular^2 + (lado/2)^2 = radio^2
+	//
+	// Sabemos también que el ángulo que se forma entre la perpendicular y el
+	// radio es igual a la mitad del ángulo entre dos lados de la figura.
+	//
+	//    angulo = (2 * pi / fig.n) / 2 = pi / fig.n
+	//    perpendicular = radio * cos(angulo)
+	//
+	// Entonces:
+	//
+	//    lado^2/4 = radio^2 - perpendicular^2
+	//    lado^2/4 = radio^2 - radio^2 * cos(angulo)^2
+	//    lado^2/4 = radio^2 * (1 - cos(angulo)^2)
+	//    lado^2 = 4 * radio^2 * (1 - cos(angulo)^2)
+	//
+	// Como son distancias, solo nos interesa la solución positiva:
+	//
+	//    lado = sqrt( 4 * radio^2 * (1 - cos(angulo)^2) )
+	//    lado = 2 * radio * sqrt(1 - cos(angulo)^2)
+	//
+	// Sabiendo que: sen(x)^2 + cos(x)^2 = 1 ==> sen(x)^2 = 1 - cos(x)^2
+	//
+	//    lado = 2 * radio * sqrt(sen(angulo)^2)
+	//    lado = 2 * radio * sen(angulo)
+	//
+	// Lo que tiene bastante sentido porque viendo el triángulo:
+	//
+	//    lado/2 = radio * sen(angulo)
+	//
+	// Y directamente sacas que:
+	//
+	//    lado = 2 * radio * sen(angulo)
+	//
+	// Bueno, son las 3am, no lo había visto antes...
+	radius := m.vector_length(fig.center - fig.radius)
+	side := 2 * radius * m.sin(m.PI / f32(fig.n))
+
+	// Segundo: calcular la frecuencia.
+	//
+	// Empezamos con el período: ¿cuánto tarda en recorrer el lado?
+	//
+	//    lado (px) / velocidad (px/s) = período (s)
+	//
+	// Con el período, es trivial conocer la frecuencia:
+	//
+	//    período (s) = 1 / frecuencia (1/s)
+	//    frecuencia (1/s) = 1 / período (s)
+	//
+	// Entonces:
+	//
+	//    frecuencia = 1 / período
+	//    frecuencia = 1 / (lado / velocidad)
+	//    frecuencia = velocidad / lado
+	//
+	// Si se desea conocer los BPM, se puede hacer con un sencillo factor de
+	// conversión:
+	//
+	//    frecuencia (1/s) * 60 s / 1 min = BPM (1/min)
+	//
+	fig.frecuency = POINT_SPEED / side
+}
+
+// Operación inversa de la función anterior: usa su campo de frecuencia para
+// determinar qué radio tendría que tener
+update_figure_radius :: #force_inline proc "contextless" (fig: ^Regular_Figure) {
+	side := fig.frecuency / POINT_SPEED
+
+	// Teníamos de antes:
+	//
+	//    lado = 2 * radio * sen(angulo)
+	//    radio = lado / (2 * sen(angulo))
+	//
+	// Cuidado con:
+	//
+	//    1 - cos(angulo)^2 = 0
+	//    cos(angulo)^2 = 1
+	//    cos(angulo) = +/- 1
+	//    ==> angulo = 0 + 2 * pi * k,  \forall k \in \RR
+	//
+	// Pero con angulo = pi / fig.n != 0, entonces no hay problema
+	//
+	// La forma completa:
+	//
+	//    radio^2 = perpendicular^2 + (lado/2)^2
+	//    radio^2 = (radio * cos(angulo))^2 + lado^2 / 4
+	//    radio^2 - radio^2 * cos(angulo)^2 = lado^2 / 4
+	//    radio^2 * (1 - cos(angulo)^2) = lado^2 / 4
+	//    radio^2 = (lado^2 / 4) / (1 - cos(angulo)^2)
+	//    radio = sqrt( (lado^2 / 4) / (1 - cos(angulo)^2) )
+	//    radio = lado/2 * sqrt( 1 / (1 - cos(angulo)^2) )
+	//    radio = lado/2 * sqrt( 1 / (sen(angulo)^2) )
+	//    radio = lado/2 * 1 / sen(angulo)
+	//    radio = lado / (2 * sen(angulo))
+	//
+	radius := side / (2 * m.sin(m.PI / f32(fig.n)))
+
+	// Ahora calcular un nuevo fig.radius que mantenga la misma orientación y
+	// cumpla:
+	//
+	//    m.vector_length(fig.center - fig.radius) = radius
+	//
+	// Para ello, tomar un vector unitario con el mismo sentido y orientación y
+	// escalarlo para que tenga justo ese radio.
+	diff := m.normalize0(fig.center - fig.radius)
+	fig.radius = fig.center + diff * radius
 }

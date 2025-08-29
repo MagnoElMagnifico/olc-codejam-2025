@@ -325,14 +325,15 @@ render_figure_ui :: proc() {
 	
 	// BPM config
 
+	bpm := int(game_state.current_figure.frecuency * 60)
 	if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
 		append(&bpm_text,49) //60 es el valor inicial
 		append(&bpm_text,0)
 	}
 
 	buf: [32]u8;
-    str := strconv.itoa(buf[:], cast(int)game_state.current_figure.bpm);
-	if int(game_state.current_figure.bpm) != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
+    str := strconv.itoa(buf[:], bpm);
+	if bpm != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
 		for len(bpm_text) > 1{
 			char_count -= 1
 			if char_count < 0 {
@@ -349,6 +350,7 @@ render_figure_ui :: proc() {
 			char_count += 1
 		}
 	}
+
 	{
 		if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
 			append(&bpm_text, 0)
@@ -400,12 +402,22 @@ render_figure_ui :: proc() {
 		
 		rl.GuiLabel({current_x, current_y, 50, UI_LINE_HEIGHT}, "Bpm:")
 		current_x += 100 + UI_PADDING
+
 		rl.DrawRectangleRec(textBox, rl.DARKGRAY)
 		textBox = rl.Rectangle({current_x, current_y+8, 50, UI_LINE_HEIGHT - 15 })
 		current_x += UI_PADDING
+
 		rl.DrawText(cast(cstring) &bpm_text[0], i32(current_x), i32(current_y)+10, 5, rl.WHITE)
-		ok:=false
-		game_state.current_figure.bpm, ok = strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
+
+		// BUG: esto no se puede ejecutar cada frame, sino solo cuando se
+		// confirme el valor. De lo contrario, update_figure_radius() querrá
+		// cambiar el radio de la figura mientras el usuario quiere usar el
+		// ratón. Este if es solo un apaño.
+		if game_state.state != .Edit_Figure {
+			input_bmp, _ := strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
+			game_state.current_figure.frecuency = f32(input_bmp) / 60.0
+			update_figure_radius(game_state.current_figure)
+		}
 	}
 
 	current_x = UI_figure_panel_dim.x + UI_PADDING
@@ -449,7 +461,7 @@ render_debug_info :: proc() {
 	current_y : c.int = game_state.window_size.y - 7 * (UI_FONT_SIZE + UI_PADDING/2) - UI_MARGIN
 
 	rl.DrawText(
-		fmt.caprintf("tool: %w\x00", game_state.tool, context.temp_allocator),
+		fmt.caprintf("tool: %w", game_state.tool, allocator = context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
@@ -457,7 +469,7 @@ render_debug_info :: proc() {
 	current_y += UI_FONT_SIZE + UI_PADDING/2
 
 	rl.DrawText(
-		fmt.caprintf("selection: %w\x00", game_state.state, context.temp_allocator),
+		fmt.caprintf("selection: %w", game_state.state, allocator = context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
@@ -465,7 +477,7 @@ render_debug_info :: proc() {
 	current_y += UI_FONT_SIZE + UI_PADDING/2
 
 	rl.DrawText(
-		fmt.caprintf("frame time: %1.5f\x00", rl.GetFrameTime(), context.temp_allocator),
+		fmt.caprintf("frame time: %1.5f", rl.GetFrameTime(), allocator = context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
@@ -473,7 +485,7 @@ render_debug_info :: proc() {
 	current_y += UI_FONT_SIZE + UI_PADDING/2
 
 	rl.DrawText(
-		fmt.caprintf("simulation: %w\x00", game_state.simulation_running, context.temp_allocator),
+		fmt.caprintf("simulation: %w", game_state.simulation_running, allocator = context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
@@ -481,7 +493,7 @@ render_debug_info :: proc() {
 	current_y += UI_FONT_SIZE + UI_PADDING/2
 
 	rl.DrawText(
-		fmt.caprintf("zoom: %1.5f\x00", game_state.camera.zoom, context.temp_allocator),
+		fmt.caprintf("zoom: %1.5f", game_state.camera.zoom, allocator = context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
@@ -489,7 +501,7 @@ render_debug_info :: proc() {
 	current_y += UI_FONT_SIZE + UI_PADDING/2
 
 	rl.DrawText(
-		fmt.caprintf("figures len: %d, figures cap: %d\x00", len(game_state.figures), cap(game_state.figures), context.temp_allocator),
+		fmt.caprintf("figures len: %d, figures cap: %d", len(game_state.figures), cap(game_state.figures), allocator = context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
@@ -504,7 +516,7 @@ render_debug_info :: proc() {
 	}
 
 	rl.DrawText(
-		fmt.caprintf("figures selected: %d\x00", n_selected, context.temp_allocator),
+		fmt.caprintf("figures selected: %d", n_selected, allocator = context.temp_allocator),
 		current_x, current_y,
 		UI_FONT_SIZE,
 		rl.WHITE
@@ -520,12 +532,12 @@ check_backspace_action :: proc() -> int{
 }
 
 // Convertir el numero actual a cstring para mostrarlo en la UI
-cstr_from_int :: proc(n: int, allocator := context.temp_allocator, loc := #caller_location) -> cstring {
+cstr_from_int :: proc(n: int, allocator := context.temp_allocator) -> cstring {
 	// Si es negativo, denota infinito
 	if n < 0 {
 		return "inf"
 	}
 
-	return fmt.caprintf("%d\x00", n, allocator, loc)
+	return fmt.caprintf("%d", n, allocator = allocator)
 }
 
