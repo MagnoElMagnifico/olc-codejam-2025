@@ -80,19 +80,19 @@ render_toolbox_ui :: proc() {
 
 	tool_changed := false
 
-	if widget_button({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "S") {
+	if widget_button({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "S", highlight = game_state.tool == .Select) {
 		game_state.tool = .Select
 		tool_changed = true
 	}
 	x += UI_BUTTON_SIZE + UI_PADDING
 
-	if widget_button({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "L") {
+	if widget_button({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "L", highlight = game_state.tool == .Link) {
 		game_state.tool = .Link
 		tool_changed = true
 	}
 	x += UI_BUTTON_SIZE + UI_PADDING
 
-	if widget_button({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "V") {
+	if widget_button({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "V", highlight = game_state.tool == .View) {
 		game_state.tool = .View
 		tool_changed = true
 	}

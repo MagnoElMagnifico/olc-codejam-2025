@@ -7,12 +7,14 @@ import m "core:math/linalg"
 
 import "core:c"
 import "core:mem"
-import "core:log"
 import "core:slice/heap"
 
 // ==== CONSTANTS =============================================================
 
-POINT_SPEED          :: 200 // px/s
+POINT_SPEED          :: 200   // px/s
+FIGURE_MIN_FRECUENCY :: 0.016 // Hz
+FIGURE_MAX_FRECUENCY :: 16.65 // Hz
+
 FIGURE_MAX_SIDES     :: 25
 FIGURE_POINT_RADIUS  :: 5.0
 FIGURE_MIN_RADIUS    :: 35
@@ -105,9 +107,7 @@ update_figure_selection_tool :: proc() {
 					point_counter_start = ui.creation_counter,
 					point_counter       = ui.creation_counter,
 
-					// TODO: limitar el tamaño para que la frecuencia se
-					// mantenga razonable
-					frecuency = 60,
+					frecuency = FIGURE_MIN_FRECUENCY,
 				})
 
 				current_figure = &figures[len(figures)-1]
@@ -123,8 +123,6 @@ update_figure_selection_tool :: proc() {
 			update_figure_frecuency(current_figure)
 
 		} else if !is_figure_big_enough(current_figure^) {
-			log.warn("es muy pequeña")
-
 			// Si la figura es muy pequeña, salir
 			// NOTE: se puede venir aquí si se selecciona una existente y se
 			// cambia de tamaño, por lo que esto puede que no lo queramos
@@ -384,7 +382,8 @@ update_figure_link_tool :: proc() {
 
 update_figure_state :: proc(fig: ^Regular_Figure) {
 	// No procesar figuras que no tienen contador o que tienen un link hacia
-	// ellas y su anterior no terminó aún
+	// ellas y su anterior no terminó aún.
+	// Tampoco procesar figuras demasiado pequeñas
 	if fig.point_counter == 0 ||
 		(fig.previous_figure != nil && fig.previous_figure.point_counter != 0) {
 		return
@@ -922,16 +921,13 @@ update_figure_frecuency :: #force_inline proc "contextless" (fig: ^Regular_Figur
 	//
 	//    frecuencia (1/s) * 60 s / 1 min = BPM (1/min)
 	//
-	fig.frecuency = POINT_SPEED / side
+	fig.frecuency = m.clamp(POINT_SPEED / side, FIGURE_MIN_FRECUENCY, FIGURE_MAX_FRECUENCY)
 }
 
 // Operación inversa de la función anterior: usa su campo de frecuencia para
 // determinar qué radio tendría que tener
 update_figure_radius :: #force_inline proc "contextless" (fig: ^Regular_Figure) {
-	if fig.frecuency <= 0 {
-		fig.frecuency = 1
-	}
-	side :=  POINT_SPEED / fig.frecuency
+	side :=  POINT_SPEED / m.clamp(fig.frecuency, FIGURE_MIN_FRECUENCY, FIGURE_MAX_FRECUENCY)
 
 	// Teníamos de antes:
 	//

@@ -195,7 +195,7 @@ update :: proc() {
 	}
 
 	// TODO: esto no funciona super bien: aún se pueden crear figuras debajo
-	if rl.IsMouseButtonDown(.LEFT) || !rl.CheckCollisionPointRec(rl.GetMousePosition(), game_state.ui.panel_toolbox) {
+	if !rl.CheckCollisionPointRec(rl.GetMousePosition(), game_state.ui.panel_toolbox) {
 		switch game_state.tool {
 		case .View: break
 		case .Select:

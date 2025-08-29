@@ -25,7 +25,7 @@ BUTTON_BORDER_COLOR :: color { 100, 100, 100, 255 }
 BUTTON_TEXT_COLOR   :: color {   0,   0,   0, 255 }
 
 // Cuando el botón está seleccionado o se pulsa se usa este color
-BUTTON_HIGHLIGHT_COLOR        :: color { 255, 255, 255, 255 }
+BUTTON_HIGHLIGHT_COLOR        :: color { 255,   0,   0, 255 }
 BUTTON_HIGHLIGHT_BORDER_COLOR :: color { 100, 100, 100, 255 }
 BUTTON_HIGHLIGHT_TEXT_COLOR   :: color {   0,   0,   0, 255 }
 
