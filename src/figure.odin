@@ -15,7 +15,7 @@ POINT_SPEED          :: 200   // px/s
 FIGURE_MIN_FRECUENCY :: 0.016 // Hz
 FIGURE_MAX_FRECUENCY :: 16.65 // Hz
 
-FIGURE_MAX_SIDES     :: 25
+FIGURE_MAX_SIDES     :: 16
 FIGURE_POINT_RADIUS  :: 5.0
 FIGURE_MIN_RADIUS    :: 35
 FIGURE_SELECTOR_SIZE :: 20
@@ -37,8 +37,7 @@ Regular_Figure :: struct {
 	radius: v2,
 	n: uint,
 	frecuency: f32,
-	color_fig: rl.Color,
-
+	
 	// Para los enlaces
 	next_figure: ^Regular_Figure,
 	previous_figure: ^Regular_Figure,
@@ -53,6 +52,8 @@ Regular_Figure :: struct {
 	point_counter_start: int,
 
 	notes: [FIGURE_MAX_SIDES]Music_Notes,
+	percussions: [FIGURE_MAX_SIDES]Percussion,
+	instrument: Instrument
 }
 
 // ==== INPUT UPDATE ==========================================================
@@ -403,14 +404,16 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 
 	// Cambiar de vértice
 	if fig.point_progress > 1.0 {
-		sound_to_play := game_state.music_notes[fig.notes[Music_Notes(fig.point_seg_index)]]
-		// TODO: mover a UI
+		sound_to_play : rl.Sound
+		if (INSTRUMENTS[fig.instrument] != "Drum") {
+			sound_to_play = game_state.SOUND_MATRIX[fig.instrument][fig.notes[Music_Notes(fig.point_seg_index)]]
+		}else{
+			sound_to_play = game_state.PERCUSSION_SOUNDS[fig.percussions[Percussion(fig.point_seg_index)]]
+		}
 		rl.SetSoundVolume(sound_to_play, f32(game_state.ui.volume/10))
-		rl.PlaySound(sound_to_play)
-
-		fig.point_progress = 0.0
-		fig.point_seg_index += 1
-
+			rl.PlaySound(sound_to_play)
+			fig.point_progress = 0.0
+			fig.point_seg_index += 1
 		// Nuevo ciclo
 		if fig.point_seg_index == fig.n {
 			fig.point_seg_index = 0

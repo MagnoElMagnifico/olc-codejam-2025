@@ -39,8 +39,8 @@ BUTTON_DISABLED_COLOR        :: rl.WHITE
 BUTTON_DISABLED_BORDER_COLOR :: rl.GRAY
 BUTTON_DISABLED_TEXT_COLOR   :: rl.BLACK
 
-Text_Box :: struct {
-	text: [dynamic]u8,
+Uint_Text_Box :: struct {
+	value: uint,
 	box: rect,
 	selected: bool,
 }
@@ -169,5 +169,4 @@ widget_label :: proc(
 	)
 }
 
-widget_text_box :: proc(state: ^Text_Box) {}
-
+widget_text_box :: proc(state: ^Uint_Text_Box) {}

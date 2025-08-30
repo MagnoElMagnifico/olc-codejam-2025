@@ -6,6 +6,7 @@ import rl "vendor:raylib"
 import "core:c"
 import "core:log"
 import "core:math/rand"
+import "core:strings"
 
 // Definiciones de tipos comunes (por comodidad)
 iv2 :: [2]c.int
@@ -21,23 +22,69 @@ MAX_FIGURES :: 10 when ODIN_DEBUG else 1024
 BACKGROUND_COLOR :: color { 30, 30, 30, 255 }
 
 Music_Notes :: enum u8 {
-	Do, Re, Mi, Fa, Sol, La, Si, Dop, Rep, Null,
+	// TODO: Añadir más notas?
+	// TODO: hacer Null = 0 para que sea la nota por defecto?
+	Do, Do_, Re, Re_, Mi, Fa, Fa_, Sol, Sol_, La, La_, Si, Do2, Do2_, Re2, Null,
 }
 
-@(rodata)
-COLOR_PICKER := [3]u8 {0, 127, 255}
+Instrument :: enum u8 {
+	Piano, Violin, Flauta, Tambor
+}
+
+Percussion :: enum u8 {
+	Floor_Tom, Tom, Bass, Snare, Crross_Stick, Plate_Bell, Charles_Open, Charles_Pedal, Ride_Cymbal, Crash_Cymbal, Hit_Hat, Null
+}
+
 
 @(rodata)
 STRING_NOTES := [Music_Notes]cstring {
 	.Do = "Do",
+	.Do_ = "Do#",
 	.Re = "Re",
+	.Re_ = "Re#",
 	.Mi = "Mi",
 	.Fa = "Fa",
+	.Fa_ = "Fa#",
 	.Sol = "Sol",
+	.Sol_ = "Sol#",
 	.La = "La",
+	.La_ = "La#",
 	.Si = "Si",
-	.Dop = "Dop",
-	.Rep = "Rep",
+	.Do2 = "Do2",
+	.Do2_ = "Do2#",
+	.Re2 = "Re2",
+	.Null = "---",
+}
+
+@(rodata)
+INSTRUMENTS := [Instrument]cstring {
+	.Piano = "Piano",
+	.Violin = "Violin",
+	.Flauta = "Flute",
+	.Tambor = "Drum",
+}
+
+@(rodata)
+INSTRUMENTS_TO_COLOR := [Instrument]rl.Color {
+	.Piano = {0, 255, 0, 255},
+	.Violin = {255, 0, 255, 255},
+	.Flauta = {0, 128, 255, 255},
+	.Tambor = {255, 128, 0, 255},
+}
+
+@(rodata)
+PERCUSSIONS := [Percussion]cstring {
+	.Floor_Tom = "Floor_Tom",
+	.Tom = "Tom",
+	.Bass = "Bass",
+	.Snare = "Snare",
+	.Crross_Stick = "Cross_Stick",
+	.Plate_Bell = "Plate_Bell",
+	.Charles_Open = "Charles_Open",
+	.Charles_Pedal = "Charles_Pedal",
+	.Ride_Cymbal = "Ride_Cymbal",
+	.Crash_Cymbal = "Crash_Cymbal",
+	.Hit_Hat = "Hit_Hat",
 	.Null = "---",
 }
 
@@ -67,7 +114,8 @@ Game_State :: struct {
 	window_size: iv2,
 
 	// ==== Resources ====
-	music_notes: [Music_Notes]rl.Sound,
+	SOUND_MATRIX: [Instrument][Music_Notes]rl.Sound,
+	PERCUSSION_SOUNDS: [Percussion]rl.Sound,
 }
 
 Selection_State :: enum {
@@ -108,6 +156,8 @@ init :: proc() {
 	ui.creation_n_sides = 3
 	ui.creation_counter = -1
 	ui.volume = 10
+	ui.bpm_text_box.box = rl.Rectangle({0, 0, 50, UI_LINE_HEIGHT - 15 })
+	ui.bpm_text_box.selected = false
 	update_ui_dimensions()
 
 	// `game_state.figures` contiene punteros a otros elementos del array, por
@@ -139,15 +189,26 @@ init :: proc() {
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
 	rl.InitAudioDevice()
 
-	game_state.music_notes[.Do]  = rl.LoadSound("assets/sounds/Do.wav")
-	game_state.music_notes[.Re]  = rl.LoadSound("assets/sounds/Re.wav")
-	game_state.music_notes[.Mi]  = rl.LoadSound("assets/sounds/Mi.wav")
-	game_state.music_notes[.Fa]  = rl.LoadSound("assets/sounds/Fa.wav")
-	game_state.music_notes[.Sol] = rl.LoadSound("assets/sounds/Sol.wav")
-	game_state.music_notes[.La]  = rl.LoadSound("assets/sounds/La.wav")
-	game_state.music_notes[.Si]  = rl.LoadSound("assets/sounds/Si.wav")
-	game_state.music_notes[.Dop] = rl.LoadSound("assets/sounds/Do'.wav")
-	game_state.music_notes[.Rep] = rl.LoadSound("assets/sounds/Re'.wav")
+	for i in Instrument {
+		if (INSTRUMENTS[i] != "Drum"){
+			c_inst := string(INSTRUMENTS[i])
+			for n in Music_Notes {
+				c_note := string(STRING_NOTES[n])
+				if (STRING_NOTES[n] != "---"){
+					path := [?]string {"assets/sounds/",c_inst,"_",c_note,".wav"}
+					game_state.SOUND_MATRIX[i][n] = rl.LoadSound(strings.clone_to_cstring(strings.concatenate(path[:])))
+				}
+			}
+		}else{
+			for p in Percussion {
+				c_per := string(PERCUSSIONS[p])
+				if (PERCUSSIONS[p] != "---"){
+					path := [?]string {"assets/sounds/Bateria_",c_per,".wav"}
+					game_state.PERCUSSION_SOUNDS[p] = rl.LoadSound(strings.clone_to_cstring(strings.concatenate(path[:])))
+				}
+			}
+		}
+	}
 
 	// No cerrar en escape
 	rl.SetExitKey(.KEY_NULL)
@@ -169,7 +230,7 @@ update :: proc() {
 		game_state.simulation_running = !game_state.simulation_running
 	}
 
-	{
+	if !game_state.ui.bpm_text_box.selected {
 		tool_changed := false
 		if rl.IsKeyPressed(.ZERO) {
 			game_state.tool = .View
@@ -234,25 +295,7 @@ update :: proc() {
 		if game_state.simulation_running {
 			update_figure_state(&f)
 		}
-
-				//log.info(game_state.current_figure.color_fig)
-		if f.color_fig[3] != 255 {
-			//Esta estructura de dato aleatorio es para prevenir que se seleccione un color demasiado oscuro
-			stop_random := false
-			r : u8 = 0
-			g : u8 = 0
-			b : u8 = 0
-			for !stop_random {
-				r = rand.choice(COLOR_PICKER[:])
-				g = rand.choice(COLOR_PICKER[:])
-				b = rand.choice(COLOR_PICKER[:])
-				if r != 0 || b != 0 || g != 0 {
-					stop_random = true
-				}
-			}
-			f.color_fig = {r,g,b,255}
-		}
-		render_regular_figure(f, f.color_fig)
+		render_regular_figure(f,INSTRUMENTS_TO_COLOR[f.instrument])
 	}
 
 	switch game_state.tool {
@@ -317,9 +360,6 @@ parent_window_size_changed :: proc(w, h: c.int) {
 }
 
 shutdown :: proc() {
-	for music_note in game_state.music_notes {
-		rl.UnloadSound(music_note)
-	}
 	rl.CloseAudioDevice()
 
 	rl.UnloadFont(game_state.ui.font)

@@ -15,9 +15,6 @@ UI_BUTTON_SIZE :: UI_LINE_HEIGHT - UI_PADDING
 UI_ERROR_MSG_TIME  :: 5.0 // s
 UI_ERROR_MSG_COLOR :: rl.RED
 
-// Tamaño del panel UI para dar a raylib
-
-
 // Se usa para determinar las propiedades de nuevas figuras
 UI_State :: struct {
 	font: rl.Font,
@@ -34,6 +31,7 @@ UI_State :: struct {
 	panel_toolbox: rect, // Este sí es constante creo
 	panel_create_figure: rect,
 	panel_figure: rect,
+	bpm_text_box: Uint_Text_Box,
 
 	// Mensajes al usuario
 	error_message: cstring,
@@ -44,7 +42,9 @@ UI_State :: struct {
 
 update_ui_dimensions :: proc() {
 	PANEL_TOOLBOX_WIDTH :: 3 * UI_BUTTON_SIZE + 4 * UI_PADDING
-	PANEL_FIGURE_WIDTH :: /* text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
+    PANEL_FIGURE_WIDTH :: /* text: */ 250 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
+    PANEL_GENERAL_WIDTH :: /* text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
+
 
 	game_state.ui.panel_toolbox = rect {
 		x = f32(game_state.window_size.x) / 2 - PANEL_TOOLBOX_WIDTH / 2,
@@ -56,7 +56,7 @@ update_ui_dimensions :: proc() {
 	game_state.ui.panel_create_figure = rect {
 		x = UI_MARGIN,
 		y = UI_MARGIN,
-		width = PANEL_FIGURE_WIDTH,
+		width = PANEL_GENERAL_WIDTH,
 		height = /* header + 2 rows + padding */ 3 * UI_LINE_HEIGHT + UI_PADDING,
 	}
 
@@ -69,10 +69,6 @@ update_ui_dimensions :: proc() {
 }
 
 // TODO: mover todas las variables estáticas a game_state
-bpm_text : [dynamic]u8
-char_count := 1
-textBox := rl.Rectangle({0, 0, 50, UI_LINE_HEIGHT - 15 })
-mouse_on_text := false
 
 render_toolbox_ui :: proc() {
 	x := game_state.ui.panel_toolbox.x
@@ -159,29 +155,29 @@ render_toolbox_ui :: proc() {
 
 	current_x = UI_PANEL_DIM.x + UI_PADDING
 	current_y += UI_LINE_HEIGHT
-
+*/
 	//Volumen
 	{
-		widget_label({current_x, current_y, 50, UI_LINE_HEIGHT}, "Volume:")
-		widget_label({current_x + 50, current_y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(game_state.volume)))
+		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Volume:")
+		widget_label({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(game_state.ui.volume)))
 
 		// añadir el width del elemento y padding para el siguiente
-		current_x += 100 + UI_PADDING
+		x += 100 + UI_PADDING
 
-		if widget_button({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
-			game_state.volume = min(game_state.volume + 1, 10)
+		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
+			game_state.ui.volume = min(game_state.ui.volume + 1, 10)
 		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
+		x += UI_LINE_HEIGHT + UI_PADDING
 
-		if widget_button({current_x, current_y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
-			game_state.volume = max(game_state.volume - 1, 0)
+		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
+			game_state.ui.volume = max(game_state.ui.volume - 1, 0)
 		}
-		current_x += UI_LINE_HEIGHT + UI_PADDING
+		x += UI_LINE_HEIGHT + UI_PADDING
 	}
 
-	current_x = UI_PADDING + UI_MARGIN
-	current_y += UI_LINE_HEIGHT
-	*/
+	x = UI_PADDING + UI_MARGIN
+	y += UI_LINE_HEIGHT
+	
 }
 
 render_create_figure_ui :: proc() {
@@ -247,7 +243,7 @@ render_figure_ui :: proc() {
 
 	widget_panel(game_state.ui.panel_figure, "Figure Options")
 
-	x := game_state.ui.panel_figure.x + UI_PADDING
+	x := game_state.ui.panel_figure.x + 6*UI_PADDING
 	y := game_state.ui.panel_figure.y + UI_LINE_HEIGHT
 
 	// Número de lados de la figura
@@ -259,15 +255,15 @@ render_figure_ui :: proc() {
 		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
 			game_state.current_figure.n = min(game_state.current_figure.n + 1, FIGURE_MAX_SIDES)
 		}
-		x += UI_LINE_HEIGHT + UI_PADDING
+		x += UI_LINE_HEIGHT + 6*UI_PADDING
 
 		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
 			game_state.current_figure.n = max(game_state.current_figure.n - 1, 2)
 		}
-		x += UI_LINE_HEIGHT + UI_PADDING
+		x += UI_LINE_HEIGHT + 6*UI_PADDING
 	}
 
-	x = game_state.ui.panel_figure.x + UI_PADDING
+	x = game_state.ui.panel_figure.x + 6*UI_PADDING
 	y += UI_LINE_HEIGHT
 
 	// Contador inicial de la figura
@@ -292,7 +288,7 @@ render_figure_ui :: proc() {
 		}
 	}
 
-	x = game_state.ui.panel_figure.x + UI_PADDING
+	x = game_state.ui.panel_figure.x + 6*UI_PADDING
 	y += UI_LINE_HEIGHT
 
 	// Especificar las notas
@@ -307,128 +303,134 @@ render_figure_ui :: proc() {
 			)
 			x += 100 + UI_PADDING
 
-			if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
-				note_value := int(game_state.current_figure.notes[vertex_index])
-				if note_value < 9 {
-					game_state.current_figure.notes[vertex_index] = Music_Notes(note_value+1)
+			if(INSTRUMENTS[game_state.current_figure.instrument] != "Drum"){
+				if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
+					note_value := int(game_state.current_figure.notes[vertex_index])
+					if note_value < len(STRING_NOTES) - 1 {
+						game_state.current_figure.notes[vertex_index] = Music_Notes(note_value+1)
+					}
 				}
-			}
-			x += UI_LINE_HEIGHT + UI_PADDING
+				x += UI_LINE_HEIGHT + 6*UI_PADDING
 
 			widget_label({x, y, 50, UI_LINE_HEIGHT}, STRING_NOTES[game_state.current_figure.notes[vertex_index]])
 
-			x += UI_LINE_HEIGHT
+				x += UI_LINE_HEIGHT + 6*UI_PADDING
 
-			if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") {
-				note_value := int(game_state.current_figure.notes[vertex_index])
-				if note_value > 0 {
-					game_state.current_figure.notes[vertex_index] = Music_Notes(note_value-1)
+				if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") {
+					note_value := int(game_state.current_figure.notes[vertex_index])
+					if note_value > 0 {
+						game_state.current_figure.notes[vertex_index] = Music_Notes(note_value-1)
+					}
+				}
+			}else{
+				if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
+					p_value := int(game_state.current_figure.percussions[vertex_index])
+					if p_value < len(PERCUSSIONS) - 1 {
+						game_state.current_figure.percussions[vertex_index] = Percussion(p_value+1)
+					}
+				}
+				x += UI_LINE_HEIGHT
+
+				widget_label({x, y, 120, UI_LINE_HEIGHT}, PERCUSSIONS[game_state.current_figure.percussions[vertex_index]])
+
+				x += UI_LINE_HEIGHT + 12*UI_PADDING
+
+				if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") {
+					p_value := int(game_state.current_figure.percussions[vertex_index])
+					if p_value > 0 {
+						game_state.current_figure.percussions[vertex_index] = Percussion(p_value-1)
+					}
 				}
 			}
-
-			x = game_state.ui.panel_figure.x + UI_PADDING
+			x = game_state.ui.panel_figure.x + 6*UI_PADDING
 			y += UI_LINE_HEIGHT
 		}
 	}
 	
+	x = game_state.ui.panel_figure.x + 6*UI_PADDING
+	//No hay necesidad de un aumento de y aquí, ya que se añadió en el for superior
+
+	//Instrumento
+	{
+		widget_label({x, y, 60, UI_LINE_HEIGHT}, "Instrument: ")
+		x += 100 + UI_PADDING
+
+		if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
+			instrument := int(game_state.current_figure.instrument)
+			if instrument < len(INSTRUMENTS) - 1 {
+				game_state.current_figure.instrument = Instrument(instrument+1)
+			}
+		}
+		x += UI_LINE_HEIGHT + UI_PADDING
+
+		widget_label({x, y, 65, UI_LINE_HEIGHT}, INSTRUMENTS[game_state.current_figure.instrument])
+
+		x += UI_LINE_HEIGHT+15
+
+		if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") {
+			instrument := int(game_state.current_figure.instrument)
+			if instrument > 0 {
+				game_state.current_figure.instrument = Instrument(instrument-1)
+			}
+		}
+		x = game_state.ui.panel_figure.x + UI_PADDING
+		y += UI_LINE_HEIGHT
+	}
+	
 	// BPM config
 	{
-		if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
-			append(&bpm_text,48)
-			append(&bpm_text,0)
-			char_count = 1
+		if !game_state.ui.bpm_text_box.selected && uint(f32(game_state.current_figure.frecuency * 60)) != game_state.ui.bpm_text_box.value {
+			game_state.ui.bpm_text_box.value = uint(f32(game_state.current_figure.frecuency * 60))
+		}
+		
+		if (rl.CheckCollisionPointRec(rl.GetMousePosition(), game_state.ui.bpm_text_box.box)) {
+			rl.SetMouseCursor(rl.MouseCursor.IBEAM)
+			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+				game_state.ui.bpm_text_box.selected = true
+			}
+		} else {
+			rl.SetMouseCursor(rl.MouseCursor.DEFAULT)
+			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
+				game_state.ui.bpm_text_box.selected = false
+				if game_state.ui.bpm_text_box.value < 1 {
+					game_state.ui.bpm_text_box.value = 60
+				}
+			}
+		}
+		if game_state.ui.bpm_text_box.selected {
+			value := rl.GetCharPressed()
+			for value > 0 {
+				if (value >= '0') && (value <= '9') && game_state.ui.bpm_text_box.value <= 99 {
+					game_state.ui.bpm_text_box.value = game_state.ui.bpm_text_box.value*10+(uint(value)-'0')
+				}
+				value = rl.GetCharPressed()
+			}
+
+			if rl.IsKeyPressed(.BACKSPACE) {
+				if game_state.ui.bpm_text_box.value <= 9 {
+					game_state.ui.bpm_text_box.value = 0
+				} else {
+					game_state.ui.bpm_text_box.value /= 10
+				}
+			}
 		}
 
-		buf: [32]u8
-		str := strconv.itoa(buf[:], int(f32(game_state.current_figure.frecuency * 60)))
-		if !mouse_on_text && int(f32(game_state.current_figure.frecuency * 60)) != strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))){
-			for len(bpm_text) > 1{
-				char_count -= 1
-				if char_count < 0 {
-					char_count = 0
-				}else{
-					pop(&bpm_text) // quitar char
-					bpm_text[char_count] = 0 // null terminator
-				}
-			}
-			for c in str{
-				append(&bpm_text, 0)               // null terminator
-				bpm_text[char_count] = u8(c)          // añadir char
-				char_count += 1
-			}
+		game_state.current_figure.frecuency = f32(game_state.ui.bpm_text_box.value) / 60
+		update_figure_radius(game_state.current_figure)
 
-		}
+		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Bpm:")
+		x += 100 + UI_PADDING
+		game_state.ui.bpm_text_box.box = rl.Rectangle({x, y-2, 50, UI_LINE_HEIGHT - 15 })
+		rl.DrawRectangleRec(game_state.ui.bpm_text_box.box, rl.DARKGRAY)
+		x += UI_PADDING
 
-		{
-			if len(bpm_text) == 0 || bpm_text[len(bpm_text)-1] != 0 {
-				append(&bpm_text, 0)
-			}
+		rl.DrawText(
+		fmt.caprintf("%d", game_state.ui.bpm_text_box.value, allocator = context.temp_allocator),
+		i32(x), i32(y),
+		UI_FONT_SIZE,
+		rl.WHITE,
+		)
 
-			if (rl.CheckCollisionPointRec(rl.GetMousePosition(), textBox)) {
-				rl.SetMouseCursor(rl.MouseCursor.IBEAM)
-				if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
-					mouse_on_text = true
-				}
-			} else {
-				rl.SetMouseCursor(rl.MouseCursor.DEFAULT)
-				if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {
-					mouse_on_text = false
-					if strconv.atoi(strings.string_from_ptr(&bpm_text[0], len(bpm_text))) < 1 {
-						char_count -= 1
-						if char_count < 0 {
-							char_count = 0
-						} else {
-							pop(&bpm_text) // quitar valor < 1
-						}
-						append(&bpm_text, 0) // null terminator
-						bpm_text[char_count] = 49 //añadir el 1
-						char_count += 1
-					}
-				}
-			}
-			if mouse_on_text {
-				value := rl.GetCharPressed()
-				for value > 0 {
-					if (value >= '0') && (value <= '9') && (char_count < 3) {
-						append(&bpm_text, 0)               // null terminator
-
-						bpm_text[char_count] = u8(value)          // store character
-						char_count += 1
-						input_bmp, _ := strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
-						game_state.current_figure.frecuency = f32(input_bmp) / f32(60.0)
-						update_figure_radius(game_state.current_figure)
-					}
-					value = rl.GetCharPressed()
-				}
-
-				if rl.IsKeyPressed(.BACKSPACE) {
-					char_count -= 1
-					if char_count < 0 {
-						char_count = 0
-					} else {
-						pop(&bpm_text) // remove character
-						bpm_text[char_count] = 0 // null terminator
-					}
-					input_bmp, _ := strconv.parse_uint(string((cast(cstring) &bpm_text[0])))
-					game_state.current_figure.frecuency = f32(input_bmp) / f32(60.0)
-					update_figure_radius(game_state.current_figure)
-				}
-			}
-
-			widget_label({x, y, 50, UI_LINE_HEIGHT}, "Bpm:")
-			x += 100 + UI_PADDING
-
-			rl.DrawRectangleRec(textBox, rl.DARKGRAY)
-			textBox = rl.Rectangle({x, y+8, 50, UI_LINE_HEIGHT - 15 })
-			x += UI_PADDING
-
-			rl.DrawText(cast(cstring) &bpm_text[0], i32(x), i32(y)+10, 5, rl.WHITE)
-
-			// BUG: esto no se puede ejecutar cada frame, sino solo cuando se
-			// confirme el valor. De lo contrario, update_figure_radius() querrá
-			// cambiar el radio de la figura mientras el usuario quiere usar el
-			// ratón. Este if es solo un apaño.
-		}
 	}
 
 	x = game_state.ui.panel_figure.x + UI_PADDING
@@ -537,7 +539,7 @@ when ODIN_DEBUG {
 }
 
 check_bpm_text_action :: proc() -> int{
-	if mouse_on_text {
+	if game_state.ui.bpm_text_box.selected {
 		return 0
 	}else{
 		return 1
