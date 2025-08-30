@@ -12,8 +12,10 @@ UI_MARGIN      :: 15
 UI_PADDING     :: 5
 UI_BUTTON_SIZE :: UI_LINE_HEIGHT - UI_PADDING
 
-UI_ERROR_MSG_TIME  :: 5.0 // s
-UI_ERROR_MSG_COLOR :: rl.RED
+UI_MSG_WIDTH       :: 200 // px
+UI_MSG_TIME        :: 5.0 // s
+UI_MSG_COLOR       :: rl.WHITE
+UI_MSG_ERROR_COLOR :: rl.RED
 
 // Se usa para determinar las propiedades de nuevas figuras
 UI_State :: struct {
@@ -34,16 +36,16 @@ UI_State :: struct {
 	bpm_text_box: Uint_Text_Box,
 
 	// Mensajes al usuario
-	error_message: cstring,
-	error_needs_free: bool, // Innecesario por el momento
-	error_timer: f32,
+	message: cstring,
+	message_is_error: bool,
+	message_timer: f32,
 }
 
 
 update_ui_dimensions :: proc() {
 	PANEL_TOOLBOX_WIDTH ::
 		/* herramientas */        4 * UI_BUTTON_SIZE + 3 * UI_PADDING +
-		/* sincronizar y reset */ 100 + 2*100 + 2*UI_PADDING +
+		/* sincronizar y reset */ 100 + 2*150 + 2*UI_PADDING +
 		/* volumen */             100 + 50 + UI_PADDING + 100
 
     PANEL_FIGURE_WIDTH :: /* text: */ 250 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
@@ -109,7 +111,7 @@ render_toolbox_ui :: proc() {
 
 	// Sincronizar puntos
 	{
-		if widget_button({x, y+UI_PADDING/2, 100, UI_BUTTON_SIZE}, "Sync beats") {
+		if widget_button({x, y+UI_PADDING/2, 150, UI_BUTTON_SIZE}, "Sync beats") {
 			if game_state.current_figure != nil {
 				using game_state.current_figure
 				point_seg_index = 0
@@ -123,11 +125,11 @@ render_toolbox_ui :: proc() {
 			}
 		}
 	}
-	x += 100 + UI_PADDING
+	x += 150 + UI_PADDING
 
 	// Reset contadores
 	{
-		if widget_button({x, y+UI_PADDING/2, 100, UI_BUTTON_SIZE}, "Reset counts") {
+		if widget_button({x, y+UI_PADDING/2, 150, UI_BUTTON_SIZE}, "Reset counts") {
 			if game_state.current_figure != nil {
 				using game_state.current_figure
 				point_counter = point_counter_start
@@ -144,7 +146,7 @@ render_toolbox_ui :: proc() {
 			}
 		}
 	}
-	x += 100 + UI_PADDING
+	x += 150 + UI_PADDING
 
 	// espacio entre estos botones y el volumen
 	x += 100
@@ -469,19 +471,23 @@ render_figure_ui :: proc() {
 	game_state.ui.panel_figure.height = y - game_state.ui.panel_figure.y
 }
 
-set_error_msg :: proc(s: cstring) {
-	game_state.ui.error_message = s
-	game_state.ui.error_timer = UI_ERROR_MSG_TIME
+set_msg :: proc(s: cstring, err := false) {
+	game_state.ui.message = s
+	game_state.ui.message_is_error = err
+	game_state.ui.message_timer = UI_MSG_TIME
 }
 
 render_error_msg :: proc() {
-	if game_state.ui.error_timer <= 0 do return
+	if game_state.ui.message_timer <= 0 do return
 
-	game_state.ui.error_timer -= rl.GetFrameTime()
-	width := rl.MeasureText(game_state.ui.error_message, UI_FONT_SIZE)
-	pos_x := game_state.window_size.x - UI_MARGIN - width
-	pos_y := game_state.window_size.y - UI_MARGIN - UI_FONT_SIZE
-	rl.DrawText(game_state.ui.error_message, pos_x, pos_y, UI_FONT_SIZE, UI_ERROR_MSG_COLOR)
+	game_state.ui.message_timer -= rl.GetFrameTime()
+	pos_x := f32(game_state.window_size.x) - UI_MARGIN - UI_MSG_WIDTH
+	pos_y := f32(game_state.window_size.y) - UI_MARGIN - UI_FONT_SIZE
+	widget_label(
+		position = { pos_x, pos_y, UI_MSG_WIDTH, UI_LINE_HEIGHT },
+		text = game_state.ui.message,
+		color = UI_MSG_ERROR_COLOR if game_state.ui.message_is_error else UI_MSG_COLOR,
+	)
 }
 
 when ODIN_DEBUG {

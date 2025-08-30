@@ -14,20 +14,23 @@ import "core:slice/heap"
 POINT_SPEED          :: 200   // px/s
 FIGURE_MIN_FRECUENCY :: 0.016 // Hz
 FIGURE_MAX_FRECUENCY :: 16.65 // Hz
+COUNTER_INF          :: -1
 
 FIGURE_MAX_SIDES     :: 16
 FIGURE_POINT_RADIUS  :: 5.0
 FIGURE_MIN_RADIUS    :: 35
 FIGURE_SELECTOR_SIZE :: 20
 
-FIGURE_VIEW_COLOR        :: rl.WHITE
-FIGURE_BEAT_COLOR        :: rl.SKYBLUE
-FIGURE_FIRST_POINT_COLOR :: rl.GREEN
-FIGURE_SELECTED_COLOR    :: rl.RED
+FIGURE_VIEW_COLOR         :: rl.WHITE
+FIGURE_BEAT_COLOR         :: rl.SKYBLUE
+FIGURE_FIRST_POINT_COLOR  :: rl.GREEN
+FIGURE_SELECTED_COLOR     :: rl.RED
+FIGURE_LINE_SIZE          :: 3.0
+FIGURE_SELECTED_LINE_SIZE :: 8.0
 
-SELECTION_RECT_COLOR :: rl.Color { 100, 100, 100, 100 }
-LINK_ARROW_HEAD_LEN :: 15.0
-COUNTER_INF :: -1
+SELECTION_RECT_COLOR :: color { 100, 100, 100, 100 }
+LINK_ARROW_HEAD_LEN  :: 15.0
+LINK_ARROW_SIZE      :: 1.0
 
 // ==== FIGURE DATA ===========================================================
 
@@ -359,7 +362,7 @@ update_figure_link_tool :: proc() {
 	// sobreescribiría el puntero `previous_figure`
 	// TODO: permitir? Entonces previous_figure: [dynamic]^Regular_Figure
 	if selected.previous_figure != nil {
-		set_error_msg("The figure is already linked")
+		set_msg("The figure is already linked", err = true)
 		current_figure = nil
 		return
 	}
@@ -425,7 +428,13 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 // ==== RENDER ================================================================
 
 @(private="file")
-render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl.Color) {
+render_regular_figure_common :: proc(
+	fig: Regular_Figure,
+	color,
+	point_color: rl.Color,
+	line_size := f32(FIGURE_LINE_SIZE),
+	arrow_size := f32(LINK_ARROW_SIZE),
+) {
 	using game_state
 
 	diff := fig.center - fig.radius
@@ -455,11 +464,13 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 		c_screen_center.x -= text_width/2
 		c_screen_center.y -= UI_FONT_SIZE/2
 
-		rl.DrawText(
-			counter_str,
-			c_screen_center.x, c_screen_center.y,
-			UI_FONT_SIZE,
-			color,
+		rl.DrawTextEx(
+			font = game_state.ui.font,
+			text = counter_str,
+			position = v2 { f32(c_screen_center.x), f32(c_screen_center.y) },
+			fontSize = UI_FONT_SIZE,
+			spacing = LABEL_SPACING,
+			tint = color,
 		)
 
 		// Dibujar línea teniendo en cuenta el círculo de selección para que no
@@ -478,29 +489,15 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 			in1 := screen_center - screen_selector
 			in2 := screen_center + screen_selector
 
-			rl.DrawLine(
-				c.int(out1.x), c.int(out1.y),
-				c.int(in1.x), c.int(in1.y),
-				color,
-			)
-
-			rl.DrawLine(
-				c.int(out2.x), c.int(out2.y),
-				c.int(in2.x), c.int(in2.y),
-				color,
-			)
+			rl.DrawLineEx(out1, in1, line_size, color)
+			rl.DrawLineEx(out2, in2, line_size, color)
 		}
 	} else if fig.n == 2 {
 		// Si no hay círculo de selección y es una línea, dibujarla completa
 		screen_diff := to_screen(camera, diff)
 		point1 := screen_center - screen_diff // = to_screen(camera, fig.radius)
 		point2 := screen_center + screen_diff
-
-		rl.DrawLine(
-			c.int(point1.x), c.int(point1.y),
-			c.int(point2.x), c.int(point2.y),
-			color,
-		)
+		rl.DrawLineEx(point1, point2, line_size, color)
 	}
 
 	// Si la figura no es una línea, dibujar normal, tenga o no círculo de
@@ -511,11 +508,12 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 		// Tener en cuenta que atan() solo funciona en [-pi/2, pi/2]
 		if diff.x >= 0 do rotation += 180
 
-		rl.DrawPolyLines(
+		rl.DrawPolyLinesEx(
 			center = screen_center,
 			sides = c.int(fig.n),
 			radius = screen_radius,
 			rotation = rotation,
+			lineThick = line_size,
 			color = color,
 		)
 	}
@@ -571,21 +569,9 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 		arrow1 := end + vec_rotate(-unit_line_vector, +m.PI/6) * LINK_ARROW_HEAD_LEN
 		arrow2 := end + vec_rotate(-unit_line_vector, -m.PI/6) * LINK_ARROW_HEAD_LEN
 
-		rl.DrawLine(
-			c.int(start.x), c.int(start.y),
-			c.int(end.x), c.int(end.y),
-			color,
-		)
-		rl.DrawLine(
-			c.int(end.x), c.int(end.y),
-			c.int(arrow1.x), c.int(arrow1.y),
-			color,
-		)
-		rl.DrawLine(
-			c.int(end.x), c.int(end.y),
-			c.int(arrow2.x), c.int(arrow2.y),
-			color,
-		)
+		rl.DrawLineEx(start, end, arrow_size, color)
+		rl.DrawLineEx(end, arrow1, arrow_size, color)
+		rl.DrawLineEx(end, arrow2, arrow_size, color)
 	}
 }
 
@@ -616,7 +602,12 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color 
 render_selected_figure :: proc(fig: Regular_Figure, color: rl.Color) {
 	using game_state
 
-	render_regular_figure_common(fig, color, color)
+	render_regular_figure_common(
+		fig = fig,
+		color = color,
+		point_color = color,
+		line_size = FIGURE_SELECTED_LINE_SIZE,
+	)
 
 	screen_point1 := to_screen(camera, fig.radius)
 	rl.DrawCircleLines(c.int(screen_point1.x), c.int(screen_point1.y), FIGURE_POINT_RADIUS, color)

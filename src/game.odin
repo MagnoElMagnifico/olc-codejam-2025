@@ -233,6 +233,7 @@ update :: proc() {
 		if rl.IsKeyPressed(.ZERO) {
 			game_state.tool = .View
 			tool_changed = true
+			set_msg("Use ESC or mode keys to return")
 		}
 
 		if rl.IsKeyPressed(.ONE) {
@@ -253,10 +254,14 @@ update :: proc() {
 		}
 	}
 
-	if !rl.CheckCollisionPointRec(rl.GetMousePosition(), game_state.ui.panel_toolbox) {
-		switch game_state.tool {
-		case .View: break
-		case .Select:
+	switch game_state.tool {
+	case .View:
+		if rl.IsKeyPressed(.ESCAPE) {
+			game_state.tool = .Select
+		}
+
+	case .Select:
+		if !rl.CheckCollisionPointRec(rl.GetMousePosition(), game_state.ui.panel_toolbox) {
 			update_figure_selection_tool()
 
 			if rl.IsKeyPressed(.ESCAPE) {
@@ -269,8 +274,10 @@ update :: proc() {
 				if game_state.current_figure != nil do delete_current_figure()
 				else if game_state.state == .Multiselection do delete_multiselected_figures()
 			}
+		}
 
-		case .Link:
+	case .Link:
+		if !rl.CheckCollisionPointRec(rl.GetMousePosition(), game_state.ui.panel_toolbox) {
 			update_figure_link_tool()
 
 			if rl.IsKeyPressed(.ESCAPE) {
@@ -297,6 +304,7 @@ update :: proc() {
 
 	switch game_state.tool {
 	case .View:
+
 	case .Select:
 		// Render la figura seleccionada en un color distinto
 		// PERF: Se dibujarán 2 veces las figuras seleccionadas
@@ -320,14 +328,15 @@ update :: proc() {
 		}
 
 		render_create_figure_ui()
+		render_toolbox_ui()
 
 	case .Link:
 		if game_state.current_figure != nil {
 			render_selected_figure(game_state.current_figure^, FIGURE_SELECTED_COLOR)
 		}
+		render_toolbox_ui()
 	}
 
-	render_toolbox_ui()
 	render_error_msg()
 
 	when ODIN_DEBUG {
