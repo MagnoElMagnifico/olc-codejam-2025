@@ -31,6 +31,13 @@ Tested with the Odin Compiler version `dev-2025-08-nightly` and Emscripten
 
 # How to use
 
+The idea of this application is to create music using regular shapes.
+The dot moving through the figure is the _beat_, and each time it reaches a
+vertex, a sound will be played. Currently there are 3 instruments.
+
+Also, if a figure is smaller, the beat will have to travel less distance, which
+means a faster pace.
+
 In _select mode_ (press `1` on your keyboard or the `S` button on the UI) you
 can:
 
@@ -40,12 +47,19 @@ can:
 -   Left click on the circle on the center of the figure to select it. With the
     UI on the right, you will be able to modify its properties: point speed,
     music notes, the counter, number of sides of the figure, etc.
+-   You can resize the figure by moving the small circle on one of the figure's
+    vertices. This makes the beat faster or slower.
+-   You can synchronize the beat with the rest of the sounds by clicking on the
+    figure's sides. To reset the current cicle, use the button `Synch beats`.
+-   Each figure will have a counter. When the beats completes one cicle, the
+    counter gets decreased by one. When the counter is 0, no more sounds will be
+    played.
 -   Holding `Shift`, you can select more, or use right click and drag to select
     figures in a rectangular fashion.
 -   Use `Delete` or `Backspace` to delete the figures currently selected.
 -   Left click elsewhere or press `Esc` to cancel the current selection.
 
-The _link mode_ (number `2` or the `V` button) will allow you to create links
+The _link mode_ (number `2` or the `L` button) will allow you to create links
 between the different figures to create longer sequences. When a figure's
 counter reaches 0, the linked figure will start playing.
 
@@ -54,8 +68,6 @@ counter reaches 0, the linked figure will start playing.
     previous.
 -   Double click a figure to remove its link (essentially, a link to itself).
 
-Please note that if you create loops (link a figure to other and the other to
-the figure), they will stop!
 
 Anytime, you can use `Space` to pause the simulation and the mouse wheel to move
 the camera around.
