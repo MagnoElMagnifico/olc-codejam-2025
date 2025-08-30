@@ -589,8 +589,7 @@ render_regular_figure_common :: proc(fig: Regular_Figure, color, point_color: rl
 	}
 }
 
-// TODO: Usar el color que tiene la figura en la estructura, no el que se le
-// pasa por parámetro
+
 render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color := FIGURE_BEAT_COLOR, fade := true) {
 	using game_state
 
@@ -602,11 +601,10 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color 
 	// Cambiar los colores si el contador llegó a 0 o si la figura anterior
 	// tiene INF
 	if fade && (fig.point_counter == 0 || (fig.previous_figure != nil && fig.previous_figure.point_counter == COUNTER_INF)) {
-		// TODO: con los colores aleatorios no se entiende que esto sea un fade
 		color = {
-			u8(f32(color.r) * 0.6),
-			u8(f32(color.b) * 0.6),
-			u8(f32(color.g) * 0.6),
+			130,
+			130,
+			130,
 			color.a,
 		}
 		point_color = color

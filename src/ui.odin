@@ -68,8 +68,6 @@ update_ui_dimensions :: proc() {
 	}
 }
 
-// TODO: mover todas las variables estáticas a game_state
-
 render_toolbox_ui :: proc() {
 	x := game_state.ui.panel_toolbox.x
 	y := game_state.ui.panel_toolbox.y
@@ -118,13 +116,6 @@ render_toolbox_ui :: proc() {
 					f.point_progress = 0
 				}
 
-			} else {
-				// TODO: borrar esta operación porque podría fastidiar el
-				// trabajo del usuario: desharía el sync creado manualmente
-				for &f in game_state.figures {
-					f.point_seg_index = 0
-					f.point_progress = 0
-				}
 			}
 		}
 	}
@@ -382,7 +373,7 @@ render_figure_ui :: proc() {
 		if !game_state.ui.bpm_text_box.selected && uint(f32(game_state.current_figure.frecuency * 60)) != game_state.ui.bpm_text_box.value {
 			game_state.ui.bpm_text_box.value = uint(f32(game_state.current_figure.frecuency * 60))
 		}
-		
+
 		if (rl.CheckCollisionPointRec(rl.GetMousePosition(), game_state.ui.bpm_text_box.box)) {
 			rl.SetMouseCursor(rl.MouseCursor.IBEAM)
 			if rl.IsMouseButtonPressed(rl.MouseButton.LEFT) {

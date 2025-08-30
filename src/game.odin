@@ -22,8 +22,6 @@ MAX_FIGURES :: 10 when ODIN_DEBUG else 1024
 BACKGROUND_COLOR :: color { 30, 30, 30, 255 }
 
 Music_Notes :: enum u8 {
-	// TODO: Añadir más notas?
-	// TODO: hacer Null = 0 para que sea la nota por defecto?
 	Do, Do_, Re, Re_, Mi, Fa, Fa_, Sol, Sol_, La, La_, Si, Do2, Do2_, Re2, Null,
 }
 
@@ -255,7 +253,6 @@ update :: proc() {
 		}
 	}
 
-	// TODO: esto no funciona super bien: aún se pueden crear figuras debajo
 	if !rl.CheckCollisionPointRec(rl.GetMousePosition(), game_state.ui.panel_toolbox) {
 		switch game_state.tool {
 		case .View: break
