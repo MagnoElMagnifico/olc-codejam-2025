@@ -159,9 +159,9 @@ render_toolbox_ui :: proc() {
 		x += 50 + UI_PADDING
 
 		// TODO: usar volume solo en el rango [0, 1]
-		game_state.ui.volume = 10 * widget_slider(
+		game_state.ui.volume = widget_slider(
 			size = {x, y, 100, UI_LINE_HEIGHT},
-			current = game_state.ui.volume / 10,
+			current = game_state.ui.volume,
 		)
 
 		when false {
@@ -488,16 +488,16 @@ set_msg :: proc(s: cstring, err := false) {
 	game_state.ui.message_timer = UI_MSG_TIME
 }
 
-render_error_msg :: proc() {
+render_msg :: proc() {
 	if game_state.ui.message_timer <= 0 do return
 
+	// TODO: Fade?
 	game_state.ui.message_timer -= rl.GetFrameTime()
-	pos_x := f32(game_state.window_size.x) - UI_MARGIN - UI_MSG_WIDTH
-	pos_y := f32(game_state.window_size.y) - UI_MARGIN - UI_FONT_SIZE
 	widget_label(
-		position = { pos_x, pos_y, UI_MSG_WIDTH, UI_LINE_HEIGHT },
+		position = { 0, UI_MARGIN, f32(game_state.window_size.x), UI_LINE_HEIGHT },
 		text = game_state.ui.message,
 		color = UI_MSG_ERROR_COLOR if game_state.ui.message_is_error else UI_MSG_COLOR,
+		hcenter = true,
 	)
 }
 
@@ -567,14 +567,6 @@ when ODIN_DEBUG {
 			UI_FONT_SIZE,
 			rl.WHITE,
 		)
-	}
-}
-
-check_bpm_text_action :: proc() -> int{
-	if game_state.ui.bpm_text_box.selected {
-		return 0
-	}else{
-		return 1
 	}
 }
 

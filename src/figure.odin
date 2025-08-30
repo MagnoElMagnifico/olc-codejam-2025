@@ -44,6 +44,7 @@ Regular_Figure :: struct {
 	// Para los enlaces
 	next_figure: ^Regular_Figure,
 	previous_figure: ^Regular_Figure,
+	is_active: bool,
 
 	// Indica en qué segmento está el punto: [0, n-1]
 	point_seg_index: uint,
@@ -111,7 +112,9 @@ update_figure_selection_tool :: proc() {
 					point_counter_start = ui.creation_counter,
 					point_counter       = ui.creation_counter,
 
+					// Valores por defecto que no son 0
 					frecuency = FIGURE_MIN_FRECUENCY,
+					is_active = true,
 				})
 
 				current_figure = &figures[len(figures)-1]
@@ -128,8 +131,7 @@ update_figure_selection_tool :: proc() {
 
 		} else if !is_figure_big_enough(current_figure^) {
 			// Si la figura es muy pequeña, salir
-			// NOTE: se puede venir aquí si se selecciona una existente y se
-			// cambia de tamaño, por lo que esto puede que no lo queramos
+			set_msg("The figure was deleted because it was too small")
 			delete_current_figure()
 			current_figure = nil
 			state = .View
@@ -329,6 +331,14 @@ update_figure_link_tool :: proc() {
 		return
 	}
 
+	// Si la figura de partida tiene un contador infinito, nunca podrá pasar a
+	// la siguiente figura. Avisar al usuario del problema
+	if selected.point_counter == COUNTER_INF {
+		current_figure = nil
+		set_msg("This figure will never end", err = true)
+		return
+	}
+
 	// Almacenar figura seleccionada para crear el siguiente link
 	if current_figure == nil {
 		current_figure = selected
@@ -346,6 +356,11 @@ update_figure_link_tool :: proc() {
 
 		// Borrar el backlink anterior
 		next.previous_figure = nil
+
+		// Marcar la siguiente como activa, porque ya no hay enlaces
+		// bloqueándola (ya no sería cierto si se permiten varios links a la
+		// misma)
+		next.is_active = true
 
 		// Y cancelar la selección
 		current_figure = nil
@@ -367,6 +382,8 @@ update_figure_link_tool :: proc() {
 		return
 	}
 
+	// ==== Crear un nuevo link ====
+
 	// Borrar el backlink de la figura que estaba antes enlazada
 	if current_figure.next_figure != nil {
 		current_figure.next_figure.previous_figure = nil
@@ -378,6 +395,29 @@ update_figure_link_tool :: proc() {
 	// Crear el backlink
 	selected.previous_figure = current_figure
 
+	// Desactivar la figura que recibe el link
+	selected.is_active = false
+
+	// Ahorar mirar si hacia atrás hay una figura activa
+	f := current_figure
+	for !f.is_active && f.previous_figure != nil {
+		f = f.previous_figure
+
+		// Hemos encontrado un bucle si volvemos al inicio.
+		// En tal caso, como creamos el link desde current_figure a selected,
+		// selected debería estar ejecutándose ahora
+		if f == selected {
+			selected.is_active = true
+			break
+		}
+	}
+
+	// Si no había un bucle, resetear la figura apuntada, para que empiece de 0
+	if !selected.is_active {
+		selected.point_counter = selected.point_counter_start
+		selected.point_progress = 0
+	}
+
 	// Y cancelar la selección
 	current_figure = nil
 }
@@ -385,11 +425,14 @@ update_figure_link_tool :: proc() {
 // ==== STATE UPDATE ==========================================================
 
 update_figure_state :: proc(fig: ^Regular_Figure) {
-	// No procesar figuras que no tienen contador o que tienen un link hacia
-	// ellas y su anterior no terminó aún.
-	// Tampoco procesar figuras demasiado pequeñas
-	if fig.point_counter == 0 ||
-		(fig.previous_figure != nil && fig.previous_figure.point_counter != 0) {
+	// No procesar figuras inactivas
+	//
+	// Antes el chequeo era que no tuviese contador y que la figura anterior
+	// tenga aún contador:
+	//
+	//    fig.point_counter == 0 || (fig.previous_figure != nil && fig.previous_figure.point_counter != 0)
+	//
+	if !fig.is_active {
 		return
 	}
 
@@ -399,7 +442,7 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 	// Funciones de Odin con precisión de nanosegundos (por si raylib es
 	// demasiado poco preciso):
 	//
-	//     import core:time
+	//     import "core:time"
 	//     time.now() -> Time
 	//     time.since(Time) -> Duration
 	//
@@ -407,23 +450,57 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 
 	// Cambiar de vértice
 	if fig.point_progress > 1.0 {
+		// Mover el punto
+		fig.point_progress = 0.0
+		fig.point_seg_index += 1
+
+		// Tocar el sonido
 		if is_figure_big_enough(fig^) {
-			sound_to_play : rl.Sound
-			if (INSTRUMENTS[fig.instrument] != "Drum") {
+			sound_to_play: rl.Sound
+			if fig.instrument != .Tambor {
 				sound_to_play = game_state.SOUND_MATRIX[fig.instrument][fig.notes[Music_Notes(fig.point_seg_index)]]
-			}else{
+			} else {
 				sound_to_play = game_state.PERCUSSION_SOUNDS[fig.percussions[Percussion(fig.point_seg_index)]]
 			}
-			rl.SetSoundVolume(sound_to_play, f32(game_state.ui.volume/10))
-				rl.PlaySound(sound_to_play)
+
+			rl.SetSoundVolume(sound_to_play, game_state.ui.volume)
+			rl.PlaySound(sound_to_play)
 		}
-		fig.point_progress = 0.
-		fig.point_seg_index += 1
 		
 		// Nuevo ciclo
 		if fig.point_seg_index == fig.n {
 			fig.point_seg_index = 0
-			if fig.point_counter > 0 do fig.point_counter -= 1
+
+			if fig.point_counter > 1 {
+				// Decrementar contador si todavía tiene
+				fig.point_counter -= 1
+
+			} else if fig.point_counter == 1 {
+				// Poner el contador a 0
+				fig.point_counter = 0
+
+				// Sino, pasar a inactivo y resetear el contador
+				fig.is_active = false
+				fig.point_counter = fig.point_counter_start
+
+				// Dar el paso a la siguiente figura, si hay
+				next := fig.next_figure
+				for next != nil {
+					// Si la siguiente tiene contador disponible, ejecutar esa
+					// Sino, seguir buscando
+					if next.point_counter != 0 {
+						next.is_active = true
+						break
+					}
+
+					// Ciclo encontrado, no entrar en bucle infinito
+					if next == fig {
+						break
+					}
+
+					next = next.next_figure
+				}
+			}
 		}
 	
 	}
@@ -590,7 +667,7 @@ render_regular_figure :: proc(fig: Regular_Figure, color: rl.Color, point_color 
 
 	// Cambiar los colores si el contador llegó a 0 o si la figura anterior
 	// tiene INF
-	if fade && (fig.point_counter == 0 || (fig.previous_figure != nil && fig.previous_figure.point_counter == COUNTER_INF)) {
+	if fade && !fig.is_active {
 		color = {
 			130,
 			130,
@@ -682,6 +759,11 @@ delete_current_figure :: proc() {
 
 	if current_figure.next_figure != nil {
 		current_figure.next_figure.previous_figure = nil
+
+		// Activar la siguiente figura
+		if current_figure.is_active {
+			current_figure.next_figure.is_active = true
+		}
 	}
 
 	// Mueve el último elemento al actual y reduce la longitud en 1
@@ -739,7 +821,12 @@ delete_multiselected_figures :: proc() {
 		// No romper los links: ver explicación en `delete_current_figure`
 		current := &figures[indices[0]]
 		if current.previous_figure != nil do current.previous_figure.next_figure = nil
-		if current.next_figure != nil do current.next_figure.previous_figure = nil
+		if current_figure.next_figure != nil {
+			current_figure.next_figure.previous_figure = nil
+			if current_figure.is_active {
+				current_figure.next_figure.is_active = true
+			}
+		}
 
 		unordered_remove(&figures, indices[0])
 
