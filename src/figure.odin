@@ -13,13 +13,13 @@ import "core:slice/heap"
 
 POINT_SPEED          :: 200   // px/s
 FIGURE_MIN_FRECUENCY :: 0.016 // Hz
-FIGURE_MAX_FRECUENCY :: 16.65 // Hz
+FIGURE_MAX_FRECUENCY :: 11 // Hz
 COUNTER_INF          :: -1
 
 FIGURE_MAX_SIDES     :: 16
 FIGURE_POINT_RADIUS  :: 5.0
-FIGURE_MIN_RADIUS    :: 35
-FIGURE_SELECTOR_SIZE :: 20
+FIGURE_MIN_RADIUS    :: 30
+FIGURE_SELECTOR_SIZE :: 15
 
 FIGURE_VIEW_COLOR         :: rl.WHITE
 FIGURE_BEAT_COLOR         :: rl.SKYBLUE
@@ -407,21 +407,25 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 
 	// Cambiar de vértice
 	if fig.point_progress > 1.0 {
-		sound_to_play : rl.Sound
-		if (INSTRUMENTS[fig.instrument] != "Drum") {
-			sound_to_play = game_state.SOUND_MATRIX[fig.instrument][fig.notes[Music_Notes(fig.point_seg_index)]]
-		}else{
-			sound_to_play = game_state.PERCUSSION_SOUNDS[fig.percussions[Percussion(fig.point_seg_index)]]
+		if is_figure_big_enough(fig^) {
+			sound_to_play : rl.Sound
+			if (INSTRUMENTS[fig.instrument] != "Drum") {
+				sound_to_play = game_state.SOUND_MATRIX[fig.instrument][fig.notes[Music_Notes(fig.point_seg_index)]]
+			}else{
+				sound_to_play = game_state.PERCUSSION_SOUNDS[fig.percussions[Percussion(fig.point_seg_index)]]
+			}
+			rl.SetSoundVolume(sound_to_play, f32(game_state.ui.volume/10))
+				rl.PlaySound(sound_to_play)
 		}
-		rl.SetSoundVolume(sound_to_play, f32(game_state.ui.volume/10))
-			rl.PlaySound(sound_to_play)
-			fig.point_progress = 0.0
-			fig.point_seg_index += 1
+		fig.point_progress = 0.
+		fig.point_seg_index += 1
+		
 		// Nuevo ciclo
 		if fig.point_seg_index == fig.n {
 			fig.point_seg_index = 0
 			if fig.point_counter > 0 do fig.point_counter -= 1
 		}
+	
 	}
 }
 
@@ -831,8 +835,8 @@ select_figure :: proc() -> (selected: ^Regular_Figure) {
 // distancia d en screen space
 @(private="file")
 is_figure_big_enough :: #force_inline proc "contextless" (fig: Regular_Figure) -> bool {
-	diff := to_screen(game_state.camera, fig.center - fig.radius)
-	return m.vector_length2(diff) > FIGURE_MIN_RADIUS * FIGURE_MIN_RADIUS
+	diff := fig.center - fig.radius
+	return m.vector_length2(diff) > FIGURE_MIN_RADIUS
 }
 
 @(private="file")

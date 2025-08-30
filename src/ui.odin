@@ -5,6 +5,7 @@ import rl "vendor:raylib"
 import "core:fmt"
 import "core:strconv"
 import "core:strings"
+import "core:log"
 
 UI_FONT_SIZE   :: 12
 UI_LINE_HEIGHT :: 30
@@ -265,15 +266,17 @@ render_figure_ui :: proc() {
 
 	// Número de lados de la figura
 	{
-		widget_label({x,      y, 50, UI_LINE_HEIGHT}, "Sides:")
-		widget_label({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(game_state.current_figure.n)))
+		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Sides:")
+
 		x += 100 + UI_PADDING
 
 		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
 			game_state.current_figure.n = min(game_state.current_figure.n + 1, FIGURE_MAX_SIDES)
 		}
-		x += UI_LINE_HEIGHT + 6*UI_PADDING
 
+		x += UI_LINE_HEIGHT + 5*UI_PADDING
+		widget_label({x, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(game_state.current_figure.n)))
+		x += UI_LINE_HEIGHT + UI_PADDING
 		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
 			game_state.current_figure.n = max(game_state.current_figure.n - 1, 2)
 		}
@@ -286,12 +289,14 @@ render_figure_ui :: proc() {
 	// Contador inicial de la figura
 	{
 		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Counter:")
-		widget_label({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(game_state.current_figure.point_counter_start))
 		x += 100 + UI_PADDING
 
 		if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
 			game_state.current_figure.point_counter_start = min(game_state.current_figure.point_counter_start + 1, 100)
 		}
+		
+		x += UI_LINE_HEIGHT + 5*UI_PADDING
+		widget_label({x, y, 45, UI_LINE_HEIGHT}, cstr_from_int(game_state.current_figure.point_counter_start))
 		x += UI_LINE_HEIGHT + UI_PADDING
 
 		if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") &&
@@ -393,6 +398,9 @@ render_figure_ui :: proc() {
 		x = game_state.ui.panel_figure.x + UI_PADDING
 		y += UI_LINE_HEIGHT
 	}
+
+		x = game_state.ui.panel_figure.x + 6*UI_PADDING
+
 	
 	// BPM config
 	{
@@ -419,6 +427,9 @@ render_figure_ui :: proc() {
 			for value > 0 {
 				if (value >= '0') && (value <= '9') && game_state.ui.bpm_text_box.value <= 99 {
 					game_state.ui.bpm_text_box.value = game_state.ui.bpm_text_box.value*10+(uint(value)-'0')
+					if game_state.ui.bpm_text_box.value > 660 {
+						game_state.ui.bpm_text_box.value = 660
+					}
 				}
 				value = rl.GetCharPressed()
 			}
@@ -437,20 +448,20 @@ render_figure_ui :: proc() {
 
 		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Bpm:")
 		x += 100 + UI_PADDING
-		game_state.ui.bpm_text_box.box = rl.Rectangle({x, y-2, 50, UI_LINE_HEIGHT - 15 })
+		game_state.ui.bpm_text_box.box = rl.Rectangle({x, y+7, 50, UI_LINE_HEIGHT - 15 })
 		rl.DrawRectangleRec(game_state.ui.bpm_text_box.box, rl.DARKGRAY)
 		x += UI_PADDING
 
 		rl.DrawText(
 		fmt.caprintf("%d", game_state.ui.bpm_text_box.value, allocator = context.temp_allocator),
-		i32(x), i32(y),
+		i32(x), i32(y+9),
 		UI_FONT_SIZE,
 		rl.WHITE,
 		)
 
 	}
 
-	x = game_state.ui.panel_figure.x + UI_PADDING
+	x = game_state.ui.panel_figure.x + 6*UI_PADDING
 	y += UI_LINE_HEIGHT
 
 	// Borrar figura
