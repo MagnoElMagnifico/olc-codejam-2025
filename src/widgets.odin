@@ -1,7 +1,7 @@
 package game
 
 import rl "vendor:raylib"
-import "core:log"
+import "core:fmt"
 
 // ==== Labels ====
 LABEL_FONT_SIZE :: 12
@@ -30,14 +30,21 @@ BUTTON_HIGHLIGHT_BORDER_COLOR :: color { 100, 100, 100, 255 }
 BUTTON_HIGHLIGHT_TEXT_COLOR   :: color {   0,   0,   0, 255 }
 
 // Cuando el ratón está encima, usa estos colores
-BUTTON_HOVER_COLOR        :: rl.WHITE
-BUTTON_HOVER_BORDER_COLOR :: rl.GRAY
-BUTTON_HOVER_TEXT_COLOR   :: rl.BLACK
+BUTTON_HOVER_COLOR        :: color { 255, 255, 255, 255 }
+BUTTON_HOVER_BORDER_COLOR :: color { 130, 130, 130, 255 }
+BUTTON_HOVER_TEXT_COLOR   :: color {   0,   0,   0, 255 }
 
 // Cuando el botón está desactivado
-BUTTON_DISABLED_COLOR        :: rl.WHITE
-BUTTON_DISABLED_BORDER_COLOR :: rl.GRAY
-BUTTON_DISABLED_TEXT_COLOR   :: rl.BLACK
+BUTTON_DISABLED_COLOR        :: color { 130, 130, 130, 255 }
+BUTTON_DISABLED_BORDER_COLOR :: color { 130, 130, 130, 255 }
+BUTTON_DISABLED_TEXT_COLOR   :: color {   0,   0,   0, 255 }
+
+// ==== Slider ====
+SLIDER_BORDER_SIZE  :: 3.0
+SLIDER_FRONT_COLOR  :: color {   0,   0, 255, 255 }
+SLIDER_BACK_COLOR   :: color { 100, 100, 100, 255 }
+SLIDER_BORDER_COLOR :: color { 130, 130, 130, 255 }
+SLIDER_TEXT_COLOR   :: color { 255, 255, 255, 255 }
 
 Uint_Text_Box :: struct {
 	value: uint,
@@ -123,7 +130,7 @@ widget_button :: proc(
 		hcenter = true,
 	)
 
-	return click && hover
+	return false if disabled else click && hover
 }
 
 widget_label :: proc(
@@ -170,3 +177,124 @@ widget_label :: proc(
 }
 
 widget_text_box :: proc(state: ^Uint_Text_Box) {}
+
+// Recibe el tamaño y el progreso actual [0, 1] y devuelve el progreso
+// actualizado (igual que antes si no hay cambios, o con el porcentaje nuevo si
+// el usuario lo cambió)
+widget_slider :: proc(size: rect, current: f32, show_number := true) -> (new: f32) {
+	new = current
+
+	// TODO: no se puede poner al 100% y puede ser un poco frustrante
+	mouse := rl.GetMousePosition()
+	hover := rl.CheckCollisionPointRec(mouse, size)
+	click := rl.IsMouseButtonDown(.LEFT)
+	if hover && click {
+		new = (mouse.x - size.x) / size.width
+	}
+
+	// Fondo
+	rl.DrawRectangleRec(size, SLIDER_BACK_COLOR)
+
+	// Progreso
+	progress_size := size
+	progress_size.width = min(current * size.width, size.width)
+	rl.DrawRectangleRec(progress_size, SLIDER_FRONT_COLOR)
+
+	if show_number {
+		widget_label(
+			position = size,
+			text = fmt.caprintf("  %2.1f %%", 100 * current, allocator = context.temp_allocator),
+			color = SLIDER_TEXT_COLOR,
+			hcenter = false,
+		)
+	}
+
+	// Borde
+	rl.DrawRectangleLinesEx(size, SLIDER_BORDER_SIZE, SLIDER_FRONT_COLOR)
+
+	return
+}
+
+widget_number :: proc(
+	text: cstring,
+	number: ^$T,
+	minimum, maximum: T,
+	size: rect,
+	step := 1,
+	label := f32(0.5),
+) {
+	assert(step > 0, "step must be positive non-null number")
+
+	// Button size
+	button_size := size.height - UI_PADDING/2
+
+	// Calcular el tamaño que le corresponde a cada parte del texto
+	space_for_text := size.width - 5*UI_PADDING - 2*button_size
+	label_width := label * space_for_text
+	number_width := (1 - label) * space_for_text
+
+	// Dibujar label que indica qué es el valor a modificar
+	x := size.x
+	widget_label({x, size.y, label_width, size.height}, text)
+	x += label_width + UI_PADDING
+
+	// Dibujar el botón de restar
+	if widget_button(
+		text = "-",
+		size = {x, size.y+UI_PADDING/2, button_size, button_size},
+		disabled = number^ <= minimum,
+	) {
+		number^ = max(number^ - cast(T) step, minimum)
+	}
+	x += UI_BUTTON_SIZE + UI_PADDING
+
+	// Dibujar el valor actual
+	widget_label(
+		position = rect {x, size.y, number_width, button_size},
+		text = cstr_from_int(int(number^)),
+		hcenter = true,
+	)
+	x += number_width + UI_PADDING
+
+	// Dibujar el botón para sumar
+	if widget_button(
+		text = "+",
+		size = {x, size.y+UI_PADDING/2, button_size, button_size},
+		disabled = number^ >= maximum,
+	) {
+		number^ = min(number^ + cast(T) step, maximum)
+	}
+}
+
+widget_number_inf :: proc(
+	text: cstring,
+	number: ^$T,
+	minimum, maximum: T,
+	size: rect,
+	step := 1,
+	label := f32(0.5),
+	inf := COUNTER_INF,
+	inf_size := f32(1.5),
+) {
+	assert(step > 0, "step must be positive non-null number")
+
+	button_size := size.height - UI_PADDING/2
+	inf_button_size := inf_size * button_size
+	new_size := size
+	new_size.width -= inf_button_size + UI_PADDING
+
+	widget_number(text, number, minimum, maximum, new_size, step, label)
+
+	// Dibujar el botón de infinito sumar
+	if widget_button(
+		text = "inf",
+		size = {
+			size.x + size.width - inf_button_size - 3*UI_PADDING,
+			size.y+UI_PADDING/2,
+			inf_button_size, button_size,
+		},
+		disabled = number^ == COUNTER_INF,
+	) {
+		number^ = COUNTER_INF
+	}
+}

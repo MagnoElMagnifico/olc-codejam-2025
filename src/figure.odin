@@ -53,7 +53,7 @@ Regular_Figure :: struct {
 
 	notes: [FIGURE_MAX_SIDES]Music_Notes,
 	percussions: [FIGURE_MAX_SIDES]Percussion,
-	instrument: Instrument
+	instrument: Instrument,
 }
 
 // ==== INPUT UPDATE ==========================================================

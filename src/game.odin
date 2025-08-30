@@ -26,11 +26,11 @@ Music_Notes :: enum u8 {
 }
 
 Instrument :: enum u8 {
-	Piano, Violin, Flauta, Tambor
+	Piano, Violin, Flauta, Tambor,
 }
 
 Percussion :: enum u8 {
-	Floor_Tom, Tom, Bass, Snare, Crross_Stick, Plate_Bell, Charles_Open, Charles_Pedal, Ride_Cymbal, Crash_Cymbal, Hit_Hat, Null
+	Floor_Tom, Tom, Bass, Snare, Crross_Stick, Plate_Bell, Charles_Open, Charles_Pedal, Ride_Cymbal, Crash_Cymbal, Hit_Hat, Null,
 }
 
 

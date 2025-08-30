@@ -41,14 +41,17 @@ UI_State :: struct {
 
 
 update_ui_dimensions :: proc() {
-	PANEL_TOOLBOX_WIDTH :: 3 * UI_BUTTON_SIZE + 4 * UI_PADDING
+	PANEL_TOOLBOX_WIDTH ::
+		/* herramientas */        4 * UI_BUTTON_SIZE + 3 * UI_PADDING +
+		/* sincronizar y reset */ 100 + 2*100 + 2*UI_PADDING +
+		/* volumen */             100 + 50 + UI_PADDING + 100
+
     PANEL_FIGURE_WIDTH :: /* text: */ 250 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
     PANEL_GENERAL_WIDTH :: /* text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
 
-
 	game_state.ui.panel_toolbox = rect {
 		x = f32(game_state.window_size.x) / 2 - PANEL_TOOLBOX_WIDTH / 2,
-		y = UI_MARGIN,
+		y = f32(game_state.window_size.y) - UI_LINE_HEIGHT - UI_MARGIN,
 		width = PANEL_TOOLBOX_WIDTH,
 		height = UI_LINE_HEIGHT,
 	}
@@ -57,7 +60,7 @@ update_ui_dimensions :: proc() {
 		x = UI_MARGIN,
 		y = UI_MARGIN,
 		width = PANEL_GENERAL_WIDTH,
-		height = /* header + 2 rows + padding */ 3 * UI_LINE_HEIGHT + UI_PADDING,
+		height = /* header + 2 rows + padding */ 3 * UI_LINE_HEIGHT + 2*UI_PADDING,
 	}
 
 	game_state.ui.panel_figure = rect {
@@ -69,6 +72,7 @@ update_ui_dimensions :: proc() {
 }
 
 render_toolbox_ui :: proc() {
+	// TODO: dibujar fondo y hacerlo más bonito
 	x := game_state.ui.panel_toolbox.x
 	y := game_state.ui.panel_toolbox.y
 
@@ -98,13 +102,14 @@ render_toolbox_ui :: proc() {
 		game_state.state = .View
 		clear(&game_state.selected_figures)
 	}
+	x += UI_BUTTON_SIZE + UI_PADDING
 
-	/*
+	// espacio entre las herramientas y estos botones
+	x += 100
+
 	// Sincronizar puntos
 	{
-		widget_label({current_x, current_y, 80, UI_LINE_HEIGHT}, "Sync beat(s)")
-		current_x += 100 + UI_PADDING
-		if widget_button({current_x, current_y+UI_PADDING/2, 60, UI_BUTTON_SIZE}, "X") {
+		if widget_button({x, y+UI_PADDING/2, 100, UI_BUTTON_SIZE}, "Sync beats") {
 			if game_state.current_figure != nil {
 				using game_state.current_figure
 				point_seg_index = 0
@@ -115,27 +120,23 @@ render_toolbox_ui :: proc() {
 					f.point_seg_index = 0
 					f.point_progress = 0
 				}
-
 			}
 		}
 	}
-
-	current_x = UI_PANEL_DIM.x + UI_PADDING
-	current_y += UI_LINE_HEIGHT
+	x += 100 + UI_PADDING
 
 	// Reset contadores
 	{
-		widget_label({current_x, current_y, 80, UI_LINE_HEIGHT}, "Reset counts")
-		current_x += 100 + UI_PADDING
-
-		if widget_button({current_x, current_y+UI_PADDING/2, 60, UI_BUTTON_SIZE}, "X") {
+		if widget_button({x, y+UI_PADDING/2, 100, UI_BUTTON_SIZE}, "Reset counts") {
 			if game_state.current_figure != nil {
 				using game_state.current_figure
 				point_counter = point_counter_start
+
 			} else if game_state.state == .Multiselection {
 				for &f in game_state.selected_figures {
 					f.point_counter = f.point_counter_start
 				}
+
 			} else {
 				for &f in game_state.figures {
 					f.point_counter = f.point_counter_start
@@ -143,32 +144,41 @@ render_toolbox_ui :: proc() {
 			}
 		}
 	}
+	x += 100 + UI_PADDING
 
-	current_x = UI_PANEL_DIM.x + UI_PADDING
-	current_y += UI_LINE_HEIGHT
-*/
-	//Volumen
+	// espacio entre estos botones y el volumen
+	x += 100
+
+	// Volumen
 	{
+		// TODO: escala logarítmica
 		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Volume:")
-		widget_label({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(game_state.ui.volume)))
+		x += 50 + UI_PADDING
 
-		// añadir el width del elemento y padding para el siguiente
-		x += 100 + UI_PADDING
+		// TODO: usar volume solo en el rango [0, 1]
+		game_state.ui.volume = 10 * widget_slider(
+			size = {x, y, 100, UI_LINE_HEIGHT},
+			current = game_state.ui.volume / 10,
+		)
 
-		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
-			game_state.ui.volume = min(game_state.ui.volume + 1, 10)
+		when false {
+			widget_label({x, y, 50, UI_LINE_HEIGHT}, "Volume:")
+			widget_label({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(game_state.ui.volume)))
+
+			// añadir el width del elemento y padding para el siguiente
+			x += 100 + UI_PADDING
+
+			if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
+				game_state.ui.volume = min(game_state.ui.volume + 1, 10)
+			}
+			x += UI_LINE_HEIGHT + UI_PADDING
+
+			if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
+				game_state.ui.volume = max(game_state.ui.volume - 1, 0)
+			}
+			x += UI_LINE_HEIGHT + UI_PADDING
 		}
-		x += UI_LINE_HEIGHT + UI_PADDING
-
-		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
-			game_state.ui.volume = max(game_state.ui.volume - 1, 0)
-		}
-		x += UI_LINE_HEIGHT + UI_PADDING
 	}
-
-	x = UI_PADDING + UI_MARGIN
-	y += UI_LINE_HEIGHT
-	
 }
 
 render_create_figure_ui :: proc() {
@@ -176,11 +186,34 @@ render_create_figure_ui :: proc() {
 	widget_panel(panel_create_figure, "Create figure")
 
 	// Posición inicial
-	x : f32 = panel_create_figure.x + UI_PADDING
+	x : f32 = panel_create_figure.x + UI_PADDING + PANEL_BORDER_SIZE
 	y : f32 = panel_create_figure.y + /* saltar cabecera */ UI_LINE_HEIGHT
 
 	// Número de lados de la figura
-	{
+	// TODO: convertir otros elementos de la UI a esto
+	widget_number(
+		text = "Sides:",
+		number = &creation_n_sides,
+		minimum = 2,
+		maximum = FIGURE_MAX_SIDES,
+		size = {x, y, panel_create_figure.width-PANEL_BORDER_SIZE, UI_LINE_HEIGHT},
+		label = 0.7,
+	)
+
+	x = UI_PADDING + UI_MARGIN + PANEL_BORDER_SIZE
+	y += UI_LINE_HEIGHT
+
+	// Contador de la figura
+	widget_number_inf(
+		text = "Counter:",
+		number = &creation_counter,
+		minimum = 1,
+		maximum = 100,
+		size = {x, y, panel_create_figure.width-PANEL_BORDER_SIZE, UI_LINE_HEIGHT},
+		label = 0.7,
+	)
+
+	when false {
 		widget_label({x,      y, 50, UI_LINE_HEIGHT}, "Sides:")
 		widget_label({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(creation_n_sides)))
 		x += 100 + UI_PADDING
@@ -195,12 +228,7 @@ render_create_figure_ui :: proc() {
 		}
 		x += UI_LINE_HEIGHT + UI_PADDING
 	}
-
-	x = UI_PADDING + UI_MARGIN
-	y += UI_LINE_HEIGHT
-
-	// Contador de la figura
-	{
+	when false {
 		widget_label({x,      y, 50, UI_LINE_HEIGHT}, "Counter:")
 		widget_label({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(creation_counter))
 
@@ -221,10 +249,6 @@ render_create_figure_ui :: proc() {
 			creation_counter = COUNTER_INF
 		}
 	}
-
-	x = panel_create_figure.x + UI_PADDING
-	y += UI_LINE_HEIGHT
-
 }
 
 render_figure_ui :: proc() {
