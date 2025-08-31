@@ -48,7 +48,7 @@ update_ui_dimensions :: proc() {
 	PANEL_TOOLBOX_WIDTH ::
 		/* herramientas */        4 * UI_BUTTON_SIZE + 3 * UI_PADDING +
 		/* sincronizar y reset */ 100 + 2*120 + 2*UI_PADDING +
-		/* volumen */             100 + 50 + UI_PADDING + 150 +
+		/* volumen */             100 + 65 + UI_PADDING + 150 +
 		/* extra */               10
 
     PANEL_GENERAL_WIDTH :: /* text: */ 150 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
