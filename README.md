@@ -54,6 +54,7 @@ can:
 -   Each figure will have a counter. When the beats completes one cicle, the
     counter gets decreased by one. When the counter is 0, no more sounds will be
     played.
+-   Use `Ctrl-D` to duplicate the selection.
 -   Holding `Shift`, you can select more, or use right click and drag to select
     figures in a rectangular fashion.
 -   Use `Delete` or `Backspace` to delete the figures currently selected.
