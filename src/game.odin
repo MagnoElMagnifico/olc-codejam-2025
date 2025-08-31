@@ -22,7 +22,7 @@ MAX_FIGURES :: 10 when ODIN_DEBUG else 1024
 BACKGROUND_COLOR :: color { 30, 30, 30, 255 }
 
 Music_Notes :: enum u8 {
-	Do, Do_, Re, Re_, Mi, Fa, Fa_, Sol, Sol_, La, La_, Si, Do2, Do2_, Re2, Null,
+	La_m1_, Si_m1, Do, Do_, Re, Re_, Mi, Fa, Fa_, Sol, Sol_, La, La_, Si, Do2, Do2_, Re2, Null,
 }
 
 Instrument :: enum u8 {
@@ -36,6 +36,8 @@ Percussion :: enum u8 {
 // TODO: pasar estos nombres a inglés?
 @(rodata)
 STRING_NOTES := [Music_Notes]cstring {
+	.La_m1_ = "La_m1#",
+	.Si_m1 = "Si_m1",
 	.Do = "Do",
 	.Do_ = "Do#",
 	.Re = "Re",
@@ -72,17 +74,18 @@ INSTRUMENTS_TO_COLOR := [Instrument]rl.Color {
 
 @(rodata)
 PERCUSSIONS := [Percussion]cstring {
-	.Floor_Tom = "FloorTom",
+	//Debe tener el '_' en el string, si no, no encontrará el nombre del archivo
+	.Floor_Tom = "Floor_Tom",
 	.Tom = "Tom",
 	.Bass = "Bass",
 	.Snare = "Snare",
-	.Crross_Stick = "CrossStick",
-	.Plate_Bell = "PlateBell",
-	.Charles_Open = "CharlesOpen",
-	.Charles_Pedal = "CharlesPedal",
-	.Ride_Cymbal = "RideCymbal",
-	.Crash_Cymbal = "CrashCymbal",
-	.Hit_Hat = "HitHat",
+	.Crross_Stick = "Cross_Stick",
+	.Plate_Bell = "Plate_Bell",
+	.Charles_Open = "Charles_Open",
+	.Charles_Pedal = "Charles_Pedal",
+	.Ride_Cymbal = "Ride_Cymbal",
+	.Crash_Cymbal = "Crash_Cymbal",
+	.Hit_Hat = "Hit_Hat",
 	.Null = "---",
 }
 
@@ -189,10 +192,9 @@ init :: proc() {
 
 	for i in Instrument {
 		if i != .Tambor {
+			c_inst := string(INSTRUMENTS[i])
 			for n in Music_Notes {
 				if n == .Null do continue
-
-				c_inst := string(INSTRUMENTS[i])
 				c_note := string(STRING_NOTES[n])
 				path   := [?]string { "assets/sounds/", c_inst, "_", c_note, ".wav" }
 				concat := strings.concatenate(path[:], allocator = context.temp_allocator)
@@ -203,7 +205,6 @@ init :: proc() {
 		} else {
 			for p in Percussion {
 				if p == .Null do continue
-
 				c_per := string(PERCUSSIONS[p])
 				path := [?]string { "assets/sounds/Bateria_", c_per, ".wav" }
 				concat := strings.concatenate(path[:], allocator = context.temp_allocator)

@@ -8,7 +8,8 @@ import m "core:math/linalg"
 import "core:c"
 import "core:mem"
 import "core:slice/heap"
-
+import "core:math"
+import "core:log"
 // ==== CONSTANTS =============================================================
 
 POINT_SPEED          :: 200   // px/s
@@ -132,7 +133,7 @@ update_figure_selection_tool :: proc() {
 
 		} else if !is_figure_big_enough(current_figure^) {
 			// Si la figura es muy pequeña, salir
-			set_msg("The figure was deleted because it was too small")
+			set_msg("The figure was deleted because it was too small\nZoom in to make faster shapes")
 			delete_current_figure()
 			current_figure = nil
 			state = .View
@@ -459,13 +460,19 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 		if is_figure_big_enough(fig^) {
 			sound_to_play: rl.Sound
 			if fig.instrument != .Tambor {
-				sound_to_play = game_state.SOUND_MATRIX[fig.instrument][fig.notes[Music_Notes(fig.point_seg_index)]]
+				sound_to_play = game_state.SOUND_MATRIX[fig.instrument][fig.notes[Music_Notes(fig.point_seg_index-1)]]
 			} else {
 				sound_to_play = game_state.PERCUSSION_SOUNDS[fig.percussions[Percussion(fig.point_seg_index)]]
 			}
 
-			rl.SetSoundVolume(sound_to_play, game_state.ui.volume)
-			rl.PlaySound(sound_to_play)
+			//Sensación de crecimiento linear en el volumen
+			if game_state.ui.volume != 0 {
+				rl.SetSoundVolume(sound_to_play, math.pow_f32(50, game_state.ui.volume)/50)
+				rl.PlaySound(sound_to_play)
+			}
+			
+		}else{
+			set_msg("The figure will not play any sound unless it gets bigger.")
 		}
 		
 		// Nuevo ciclo
@@ -924,7 +931,7 @@ select_figure :: proc() -> (selected: ^Regular_Figure) {
 @(private="file")
 is_figure_big_enough :: #force_inline proc "contextless" (fig: Regular_Figure) -> bool {
 	diff := fig.center - fig.radius
-	return m.vector_length2(diff) > FIGURE_MIN_RADIUS
+	return m.vector_length(diff) * game_state.camera.zoom > FIGURE_MIN_RADIUS
 }
 
 @(private="file")

@@ -292,7 +292,6 @@ render_figure_ui :: proc() {
 	// superior
 
 	// BPM config
-	// TODO: usar slider o input de teclado?
 	when true {
 		bpm := game_state.current_figure.frecuency * 60
 		if widget_slider_number(
