@@ -931,7 +931,15 @@ select_figure :: proc() -> (selected: ^Regular_Figure) {
 @(private="file")
 is_figure_big_enough :: #force_inline proc "contextless" (fig: Regular_Figure) -> bool {
 	diff := fig.center - fig.radius
-	return m.vector_length(diff) * game_state.camera.zoom > FIGURE_MIN_RADIUS
+	if (m.vector_length(diff) * game_state.camera.zoom > FIGURE_MIN_RADIUS) {
+		return true
+	} else {
+		if (fig.frecuency <= 11 && m.vector_length(diff) > 10.5){
+			return true
+		}else{
+			return false
+		}
+	}
 }
 
 @(private="file")

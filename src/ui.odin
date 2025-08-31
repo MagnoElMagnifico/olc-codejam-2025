@@ -160,10 +160,8 @@ render_toolbox_ui :: proc() {
 
 	// espacio entre estos botones y el volumen
 	x += 100
-
 	// Volumen
 	{
-		// TODO: escala logarítmica
 		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Volume")
 		x += 50 + UI_PADDING
 
