@@ -298,7 +298,7 @@ update_figure_selection_tool :: proc() {
 			// PERF: esto es bastante ineficiente porque requiere iterar por
 			// todas las figuras. Quizá se podría hacer en update_figure_state...
 			for &f in figures {
-				if rl.CheckCollisionPointRec(f.center, selection_rect) {
+				if rl.CheckCollisionPointRec(to_screen(camera, f.center), selection_rect) {
 					append(&selected_figures, &f)
 				}
 			}

@@ -270,7 +270,7 @@ render_figure_ui :: proc() {
 				widget_enum(
 					text = fmt.caprintf("Vertex %d", vertex_index + 1, allocator = context.temp_allocator),
 					value = &game_state.current_figure.notes[vertex_index],
-					enum_str = STRING_NOTES_EN,
+					enum_str = STRING_NOTES,
 					size = {x, y, game_state.ui.panel_figure.width-PANEL_BORDER_SIZE, UI_LINE_HEIGHT},
 					label = 0.4,
 				)
