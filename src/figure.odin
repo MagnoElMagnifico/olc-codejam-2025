@@ -23,6 +23,8 @@ FIGURE_MIN_RADIUS_SELECTOR :: 30
 FIGURE_MIN_RADIUS :: 10.5
 FIGURE_SELECTOR_SIZE :: 15
 
+FIGURE_EXTRA_PROGRESS_FROM_LINK :: 0
+
 FIGURE_VIEW_COLOR         :: rl.WHITE
 FIGURE_BEAT_COLOR         :: rl.SKYBLUE
 FIGURE_FIRST_POINT_COLOR  :: rl.GREEN
@@ -134,7 +136,6 @@ update_figure_selection_tool :: proc() {
 
 		} else if !is_figure_big_enough(current_figure^) {
 			// Si la figura es muy pequeña, salir
-			set_msg("The figure was deleted because it was too small\nZoom in to make faster shapes")
 			delete_current_figure()
 			current_figure = nil
 			state = .View
@@ -400,9 +401,9 @@ update_figure_link_tool :: proc() {
 
 	// Desactivar la figura que recibe el link
 	selected.is_active = false
-	
+
 	selected.point_counter = selected.point_counter_start
-	selected.point_progress = 0
+	selected.point_progress = FIGURE_EXTRA_PROGRESS_FROM_LINK
 	// Ahorar mirar si hacia atrás hay una figura activa
 	f := current_figure
 	for !f.is_active && f.previous_figure != nil {
@@ -489,6 +490,7 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 				// Dar el paso a la siguiente figura, si hay
 				if fig.next_figure != nil {
 					fig.next_figure.is_active = true
+					fig.next_figure.point_progress = FIGURE_EXTRA_PROGRESS_FROM_LINK
 				}
 
 				// Buscar ciclos y determinar si reiniciar el contador

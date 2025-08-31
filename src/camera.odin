@@ -4,7 +4,7 @@ import rl "vendor:raylib"
 import "core:math/linalg"
 
 CAMERA_ZOOM_SPEED :: 0.25
-CAMERA_ZOOM_MIN :: 0.25
+CAMERA_ZOOM_MIN :: 0.1
 CAMERA_ZOOM_MAX :: 3.0
 
 Camera :: struct {

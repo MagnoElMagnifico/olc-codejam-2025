@@ -32,7 +32,6 @@ Percussion :: enum u8 {
 	Floor_Tom, Tom, Bass, Snare, Crross_Stick, Plate_Bell, Charles_Open, Charles_Pedal, Ride_Cymbal, Crash_Cymbal, Hit_Hat, Null,
 }
 
-// TODO: pasar estos nombres a inglés?
 @(rodata)
 STRING_NOTES := [Music_Notes]cstring {
 	.La_m1_ = "La_m1#",
@@ -54,6 +53,30 @@ STRING_NOTES := [Music_Notes]cstring {
 	.Re2 = "Re2",
 	.Null = "---",
 }
+
+
+@(rodata)
+STRING_NOTES_EN := [Music_Notes]cstring {
+	.La_m1_ = "F_m1#",
+	.Si_m1 = "G_m1",
+	.Do = "A",
+	.Do_ = "A#",
+	.Re = "B",
+	.Re_ = "B#",
+	.Mi = "C",
+	.Fa = "D",
+	.Fa_ = "D#",
+	.Sol = "E",
+	.Sol_ = "E#",
+	.La = "F",
+	.La_ = "F#",
+	.Si = "G",
+	.Do2 = "A2",
+	.Do2_ = "A2#",
+	.Re2 = "B2",
+	.Null = "---",
+}
+
 
 @(rodata)
 INSTRUMENTS := [Instrument]cstring {
@@ -87,6 +110,7 @@ PERCUSSIONS := [Percussion]cstring {
 	.Hit_Hat = "Hit_Hat",
 	.Null = "---",
 }
+
 
 // ==== GAME DATA =============================================================
 
