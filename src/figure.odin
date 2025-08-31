@@ -462,7 +462,7 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 			if fig.instrument != .Tambor {
 				sound_to_play = game_state.SOUND_MATRIX[fig.instrument][fig.notes[Music_Notes(fig.point_seg_index-1)]]
 			} else {
-				sound_to_play = game_state.PERCUSSION_SOUNDS[fig.percussions[Percussion(fig.point_seg_index)]]
+				sound_to_play = game_state.PERCUSSION_SOUNDS[fig.percussions[Percussion(fig.point_seg_index-1)]]
 			}
 
 			//Sensación de crecimiento linear en el volumen
