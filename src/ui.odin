@@ -5,7 +5,6 @@ import rl "vendor:raylib"
 import "core:fmt"
 import "core:strconv"
 import "core:strings"
-import "core:log"
 
 UI_FONT_SIZE   :: 12
 UI_LINE_HEIGHT :: 30

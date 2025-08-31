@@ -9,7 +9,6 @@ import "core:c"
 import "core:mem"
 import "core:slice/heap"
 import "core:math"
-import "core:log"
 // ==== CONSTANTS =============================================================
 
 POINT_SPEED          :: 200   // px/s
@@ -823,16 +822,17 @@ delete_multiselected_figures :: proc() {
 	// Ordenar de mayor a menor
 	less :: proc(a, b: int) -> bool { return a < b }
 	heap.make(indices[:], less)
-
 	// Y borrarlos por orden
 	for _ in 0 ..< len(selected_figures) {
 		// No romper los links: ver explicación en `delete_current_figure`
 		current := &figures[indices[0]]
-		if current.previous_figure != nil do current.previous_figure.next_figure = nil
-		if current_figure.next_figure != nil {
-			current_figure.next_figure.previous_figure = nil
-			if current_figure.is_active {
-				current_figure.next_figure.is_active = true
+		if current.previous_figure != nil {
+			current.previous_figure.next_figure = nil
+		}
+		if current.next_figure != nil {
+			current.next_figure.previous_figure = nil
+			if current.is_active {
+				current.next_figure.is_active = true
 			}
 		}
 

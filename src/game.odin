@@ -4,7 +4,6 @@ package game
 
 import rl "vendor:raylib"
 import "core:c"
-import "core:log"
 import "core:math/rand"
 import "core:strings"
 
@@ -183,8 +182,7 @@ init :: proc() {
 	// grande), pero tiene un mayor uso de memoria y se impone un límite máximo
 	// de figuras.
 	figures = make([dynamic]Regular_Figure, 0, MAX_FIGURES)
-	log.info("Regular_Figure size:", size_of(Regular_Figure))
-	log.info("Total memory for figures:", size_of(Regular_Figure) * MAX_FIGURES)
+
 
 	rl.SetConfigFlags({.WINDOW_RESIZABLE, .MSAA_4X_HINT, .VSYNC_HINT})
 	rl.InitWindow(window_size.x, window_size.y, WINDOW_NAME)
