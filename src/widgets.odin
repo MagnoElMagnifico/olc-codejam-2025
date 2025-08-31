@@ -310,7 +310,7 @@ widget_number :: proc(
 		size = {x, size.y+UI_PADDING/2, button_size, button_size},
 		disabled = number^ <= minimum,
 	) {
-		number^ = max(number^ - cast(T) step, minimum)
+		number^ = math.clamp(number^ - cast(T) step, minimum, maximum)
 	}
 	x += UI_BUTTON_SIZE + UI_PADDING
 
@@ -328,7 +328,7 @@ widget_number :: proc(
 		size = {x, size.y+UI_PADDING/2, button_size, button_size},
 		disabled = number^ >= maximum,
 	) {
-		number^ = min(number^ + cast(T) step, maximum)
+		number^ = math.clamp(number^ + cast(T) step, minimum, maximum)
 	}
 }
 
