@@ -4,7 +4,6 @@ package game
 
 import rl "vendor:raylib"
 import "core:c"
-import "core:math/rand"
 import "core:strings"
 
 // Definiciones de tipos comunes (por comodidad)
@@ -54,7 +53,6 @@ STRING_NOTES := [Music_Notes]cstring {
 	.Null = "---",
 }
 
-
 @(rodata)
 STRING_NOTES_EN := [Music_Notes]cstring {
 	.La_m1_ = "F_m1#",
@@ -76,7 +74,6 @@ STRING_NOTES_EN := [Music_Notes]cstring {
 	.Re2 = "B2",
 	.Null = "---",
 }
-
 
 @(rodata)
 INSTRUMENTS := [Instrument]cstring {
@@ -174,8 +171,11 @@ init :: proc() {
 
 	// BUG: no carga la fuente: no hay errores pero se sigue usando la fuente
 	// por defecto. Tampoco con "assets/Ubuntu-Regular.ttf".
-	ui.font = rl.LoadFontEx("assets/Roboto-Regular.ttf", 32, nil, 0)
-	ensure(rl.IsFontValid(ui.font), "Invalid UI font")
+	//
+	//    rl.LoadFontEx("assets/Roboto-Regular.ttf", 32, nil, 0)
+	//    ensure(rl.IsFontValid(ui.font), "Invalid UI font")
+	//
+	ui.font = rl.GetFontDefault()
 
 	ui.creation_n_sides = 3
 	ui.creation_counter = -1
@@ -301,6 +301,26 @@ update :: proc() {
 			if rl.IsKeyPressed(.BACKSPACE) && !game_state.ui.bpm_text_box.selected || rl.IsKeyPressed(.DELETE) {
 				if game_state.current_figure != nil do delete_current_figure()
 				else if game_state.state == .Multiselection do delete_multiselected_figures()
+			}
+
+			if game_state.state == .Selected_Figure && rl.IsKeyDown(.LEFT_CONTROL) && rl.IsKeyPressed(.D) {
+				original := game_state.current_figure
+				append(&game_state.figures, Regular_Figure {
+					center              = original.center + FIGURE_DUP_OFFSET,
+					radius              = original.radius + FIGURE_DUP_OFFSET,
+					n                   = original.n,
+					frecuency           = original.frecuency,
+					instrument          = original.instrument,
+					next_figure         = nil,
+					previous_figure     = nil,
+					is_active           = true,
+					point_seg_index     = original.point_seg_index,
+					point_progress      = original.point_progress,
+					point_counter       = original.point_counter,
+					point_counter_start = original.point_counter_start,
+					notes               = original.notes,
+					percussions         = original.percussions,
+				})
 			}
 		}
 

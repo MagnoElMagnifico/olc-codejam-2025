@@ -1,11 +1,7 @@
 package game
 
 import rl "vendor:raylib"
-
 import "core:fmt"
-import "core:strconv"
-import "core:strings"
-import "core:log"
 
 UI_FONT_SIZE   :: 12
 UI_LINE_HEIGHT :: 30
@@ -51,7 +47,7 @@ update_ui_dimensions :: proc() {
 		/* volumen */             100 + 65 + UI_PADDING + 150 +
 		/* extra */               10
 
-    PANEL_GENERAL_WIDTH :: /* text: */ 150 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
+	PANEL_GENERAL_WIDTH :: /* text: */ 150 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
 
 	game_state.ui.panel_toolbox = rect {
 		x = f32(game_state.window_size.x) / 2 - PANEL_TOOLBOX_WIDTH / 2,

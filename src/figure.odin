@@ -9,7 +9,7 @@ import "core:c"
 import "core:mem"
 import "core:slice/heap"
 import "core:math"
-import "core:log"
+
 // ==== CONSTANTS =============================================================
 
 POINT_SPEED          :: 200   // px/s
@@ -24,6 +24,7 @@ FIGURE_MIN_RADIUS :: 10.5
 FIGURE_SELECTOR_SIZE :: 15
 
 FIGURE_EXTRA_PROGRESS_FROM_LINK :: 0
+FIGURE_DUP_OFFSET :: v2 { 10, 10 }
 
 FIGURE_VIEW_COLOR         :: rl.WHITE
 FIGURE_BEAT_COLOR         :: rl.SKYBLUE
@@ -468,7 +469,7 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 				rl.PlaySound(sound_to_play)
 			}
 			
-		}else{
+		} else {
 			set_msg("The figure will not play any sound unless it gets bigger.")
 		}
 		

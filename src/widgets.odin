@@ -221,64 +221,66 @@ widget_slider :: proc(
 	return
 }
 
-// Devuelve true si se modificó
-widget_slider_number :: proc(
-	size: rect,
-	current: ^$T,
-	minimum: T,
-	maximum: T,
-	show_number := true,
-	fmt_str := "%w",
-) -> bool {
-	assert(minimum < maximum, "invalid range")
+when false {
+	// Devuelve true si se modificó
+	widget_slider_number :: proc(
+		size: rect,
+		current: ^$T,
+		minimum: T,
+		maximum: T,
+		show_number := true,
+		fmt_str := "%w",
+	) -> bool {
+		assert(minimum < maximum, "invalid range")
 
-	ease_log :: proc(x: f32) -> f32 {
-		return 1 - math.pow(1 - x, 3)
+		ease_log :: proc(x: f32) -> f32 {
+			return 1 - math.pow(1 - x, 3)
+		}
+		inv_ease_log :: proc(x: f32) -> f32 {
+			return 1 - math.pow(1 - x, 1.0/3.0)
+		}
+
+		// Progreso actual
+		value := math.clamp(current^, minimum, maximum)
+		progress := (value - minimum) / (maximum - minimum)
+		progress = ease_log(progress)
+
+		// Fondo
+		rl.DrawRectangleRec(size, SLIDER_BACK_COLOR)
+
+		// Dibujar la barra
+		progress_size := size
+		progress_size.width = min(progress * size.width, size.width)
+		rl.DrawRectangleRec(progress_size, SLIDER_FRONT_COLOR)
+
+		if show_number {
+			widget_label(
+				position = size,
+				text = fmt.caprintf(fmt_str, value, allocator = context.temp_allocator),
+				color = SLIDER_TEXT_COLOR,
+				hcenter = false,
+			)
+		}
+
+		// Borde
+		rl.DrawRectangleLinesEx(size, SLIDER_BORDER_SIZE, SLIDER_BORDER_COLOR)
+
+		// No se puede poner al 100% y puede ser un poco frustrante, así que para el
+		// chequeo dejar un poco más de margen
+		size_check := size
+		size_check.width += 2*SLIDER_BORDER_SIZE
+		mouse := rl.GetMousePosition()
+		hover := rl.CheckCollisionPointRec(mouse, size_check)
+		click := rl.IsMouseButtonDown(.LEFT)
+		if hover && click {
+			new_progress := (mouse.x - size.x) / size.width
+			new_progress = inv_ease_log(new_progress)
+			current^ = math.clamp(new_progress * (maximum - minimum) + minimum, minimum, maximum)
+			return true
+		}
+
+		return false
 	}
-	inv_ease_log :: proc(x: f32) -> f32 {
-		return 1 - math.pow(1 - x, 1.0/3.0)
-	}
-
-	// Progreso actual
-	value := math.clamp(current^, minimum, maximum)
-	progress := (value - minimum) / (maximum - minimum)
-	progress = ease_log(progress)
-
-	// Fondo
-	rl.DrawRectangleRec(size, SLIDER_BACK_COLOR)
-
-	// Dibujar la barra
-	progress_size := size
-	progress_size.width = min(progress * size.width, size.width)
-	rl.DrawRectangleRec(progress_size, SLIDER_FRONT_COLOR)
-
-	if show_number {
-		widget_label(
-			position = size,
-			text = fmt.caprintf(fmt_str, value, allocator = context.temp_allocator),
-			color = SLIDER_TEXT_COLOR,
-			hcenter = false,
-		)
-	}
-
-	// Borde
-	rl.DrawRectangleLinesEx(size, SLIDER_BORDER_SIZE, SLIDER_BORDER_COLOR)
-
-	// No se puede poner al 100% y puede ser un poco frustrante, así que para el
-	// chequeo dejar un poco más de margen
-	size_check := size
-	size_check.width += 2*SLIDER_BORDER_SIZE
-	mouse := rl.GetMousePosition()
-	hover := rl.CheckCollisionPointRec(mouse, size_check)
-	click := rl.IsMouseButtonDown(.LEFT)
-	if hover && click {
-		new_progress := (mouse.x - size.x) / size.width
-		new_progress = inv_ease_log(new_progress)
-		current^ = math.clamp(new_progress * (maximum - minimum) + minimum, minimum, maximum)
-		return true
-	}
-
-	return false
 }
 
 widget_number :: proc(
