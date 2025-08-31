@@ -33,7 +33,7 @@ Percussion :: enum u8 {
 	Floor_Tom, Tom, Bass, Snare, Crross_Stick, Plate_Bell, Charles_Open, Charles_Pedal, Ride_Cymbal, Crash_Cymbal, Hit_Hat, Null,
 }
 
-
+// TODO: pasar estos nombres a inglés?
 @(rodata)
 STRING_NOTES := [Music_Notes]cstring {
 	.Do = "Do",
@@ -72,17 +72,17 @@ INSTRUMENTS_TO_COLOR := [Instrument]rl.Color {
 
 @(rodata)
 PERCUSSIONS := [Percussion]cstring {
-	.Floor_Tom = "Floor_Tom",
+	.Floor_Tom = "FloorTom",
 	.Tom = "Tom",
 	.Bass = "Bass",
 	.Snare = "Snare",
-	.Crross_Stick = "Cross_Stick",
-	.Plate_Bell = "Plate_Bell",
-	.Charles_Open = "Charles_Open",
-	.Charles_Pedal = "Charles_Pedal",
-	.Ride_Cymbal = "Ride_Cymbal",
-	.Crash_Cymbal = "Crash_Cymbal",
-	.Hit_Hat = "Hit_Hat",
+	.Crross_Stick = "CrossStick",
+	.Plate_Bell = "PlateBell",
+	.Charles_Open = "CharlesOpen",
+	.Charles_Pedal = "CharlesPedal",
+	.Ride_Cymbal = "RideCymbal",
+	.Crash_Cymbal = "CrashCymbal",
+	.Hit_Hat = "HitHat",
 	.Null = "---",
 }
 
@@ -153,8 +153,8 @@ init :: proc() {
 
 	ui.creation_n_sides = 3
 	ui.creation_counter = -1
-	ui.volume = 10
-	ui.bpm_text_box.box = rl.Rectangle({0, 0, 50, UI_LINE_HEIGHT - 15 })
+	ui.volume = 0.5
+	ui.bpm_text_box.box = rect { 0, 0, 50, UI_LINE_HEIGHT - 15 }
 	ui.bpm_text_box.selected = false
 	update_ui_dimensions()
 
@@ -188,22 +188,27 @@ init :: proc() {
 	rl.InitAudioDevice()
 
 	for i in Instrument {
-		if (INSTRUMENTS[i] != "Drum"){
-			c_inst := string(INSTRUMENTS[i])
+		if i != .Tambor {
 			for n in Music_Notes {
+				if n == .Null do continue
+
+				c_inst := string(INSTRUMENTS[i])
 				c_note := string(STRING_NOTES[n])
-				if (STRING_NOTES[n] != "---"){
-					path := [?]string {"assets/sounds/",c_inst,"_",c_note,".wav"}
-					game_state.SOUND_MATRIX[i][n] = rl.LoadSound(strings.clone_to_cstring(strings.concatenate(path[:])))
-				}
+				path   := [?]string { "assets/sounds/", c_inst, "_", c_note, ".wav" }
+				concat := strings.concatenate(path[:], allocator = context.temp_allocator)
+				cstr   := strings.clone_to_cstring(concat, allocator = context.temp_allocator)
+				game_state.SOUND_MATRIX[i][n] = rl.LoadSound(cstr)
 			}
-		}else{
+
+		} else {
 			for p in Percussion {
+				if p == .Null do continue
+
 				c_per := string(PERCUSSIONS[p])
-				if (PERCUSSIONS[p] != "---"){
-					path := [?]string {"assets/sounds/Bateria_",c_per,".wav"}
-					game_state.PERCUSSION_SOUNDS[p] = rl.LoadSound(strings.clone_to_cstring(strings.concatenate(path[:])))
-				}
+				path := [?]string { "assets/sounds/Bateria_", c_per, ".wav" }
+				concat := strings.concatenate(path[:], allocator = context.temp_allocator)
+				cstr   := strings.clone_to_cstring(concat, allocator = context.temp_allocator)
+				game_state.PERCUSSION_SOUNDS[p] = rl.LoadSound(cstr)
 			}
 		}
 	}

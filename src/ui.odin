@@ -29,6 +29,7 @@ UI_State :: struct {
 	// Panel de creación de nuevas figuras
 	creation_n_sides: uint,
 	creation_counter: int,
+	creation_instrument: Instrument,
 
 	// Dimensiones de los paneles que no sean constantes
 	panel_toolbox: rect, // Este sí es constante creo
@@ -46,11 +47,11 @@ UI_State :: struct {
 update_ui_dimensions :: proc() {
 	PANEL_TOOLBOX_WIDTH ::
 		/* herramientas */        4 * UI_BUTTON_SIZE + 3 * UI_PADDING +
-		/* sincronizar y reset */ 100 + 2*150 + 2*UI_PADDING +
-		/* volumen */             100 + 50 + UI_PADDING + 100
+		/* sincronizar y reset */ 100 + 2*120 + 2*UI_PADDING +
+		/* volumen */             100 + 50 + UI_PADDING + 150 +
+		/* extra */               10
 
-    PANEL_FIGURE_WIDTH :: /* text: */ 250 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
-    PANEL_GENERAL_WIDTH :: /* text: */ 100 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
+    PANEL_GENERAL_WIDTH :: /* text: */ 150 + /* 2 botones iguales: */ 2*UI_LINE_HEIGHT + (2*2+1)*UI_PADDING + /* botón extra*/ 40
 
 	game_state.ui.panel_toolbox = rect {
 		x = f32(game_state.window_size.x) / 2 - PANEL_TOOLBOX_WIDTH / 2,
@@ -63,19 +64,18 @@ update_ui_dimensions :: proc() {
 		x = UI_MARGIN,
 		y = UI_MARGIN,
 		width = PANEL_GENERAL_WIDTH,
-		height = /* header + 2 rows + padding */ 3 * UI_LINE_HEIGHT + 2*UI_PADDING,
+		height = /* header + 2 rows + padding */ 4 * UI_LINE_HEIGHT + 2*UI_PADDING,
 	}
 
 	game_state.ui.panel_figure = rect {
-		x = f32(game_state.window_size.x) - PANEL_FIGURE_WIDTH - UI_MARGIN,
+		x = f32(game_state.window_size.x) - PANEL_GENERAL_WIDTH - UI_MARGIN,
 		y = UI_MARGIN,
-		width = PANEL_FIGURE_WIDTH,
+		width = PANEL_GENERAL_WIDTH,
 		height = 150, // Esto depende de la figura seleccionada
 	}
 }
 
 render_toolbox_ui :: proc() {
-	// TODO: dibujar fondo y hacerlo más bonito
 	x := game_state.ui.panel_toolbox.x
 	y := game_state.ui.panel_toolbox.y
 
@@ -94,6 +94,7 @@ render_toolbox_ui :: proc() {
 	x += UI_BUTTON_SIZE + UI_PADDING
 
 	if widget_button({x, y, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "V", highlight = game_state.tool == .View) {
+		set_msg("View Mode: Use ESC or mode keys to return")
 		game_state.tool = .View
 		tool_changed = true
 	}
@@ -105,14 +106,13 @@ render_toolbox_ui :: proc() {
 		game_state.state = .View
 		clear(&game_state.selected_figures)
 	}
-	x += UI_BUTTON_SIZE + UI_PADDING
 
 	// espacio entre las herramientas y estos botones
 	x += 100
 
 	// Sincronizar puntos
 	{
-		if widget_button({x, y+UI_PADDING/2, 150, UI_BUTTON_SIZE}, "Sync beats") {
+		if widget_button({x, y+UI_PADDING/2, 120, UI_BUTTON_SIZE}, "Reset cycle") {
 			if game_state.current_figure != nil {
 				using game_state.current_figure
 				point_seg_index = 0
@@ -126,11 +126,11 @@ render_toolbox_ui :: proc() {
 			}
 		}
 	}
-	x += 150 + UI_PADDING
+	x += 120 + UI_PADDING
 
 	// Reset contadores
 	{
-		if widget_button({x, y+UI_PADDING/2, 150, UI_BUTTON_SIZE}, "Reset counts") {
+		if widget_button({x, y+UI_PADDING/2, 120, UI_BUTTON_SIZE}, "Reset counts") {
 			if game_state.current_figure != nil {
 				using game_state.current_figure
 				point_counter = point_counter_start
@@ -147,7 +147,7 @@ render_toolbox_ui :: proc() {
 			}
 		}
 	}
-	x += 150 + UI_PADDING
+	x += 120 + UI_PADDING
 
 	// espacio entre estos botones y el volumen
 	x += 100
@@ -155,32 +155,13 @@ render_toolbox_ui :: proc() {
 	// Volumen
 	{
 		// TODO: escala logarítmica
-		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Volume:")
+		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Volume")
 		x += 50 + UI_PADDING
 
-		// TODO: usar volume solo en el rango [0, 1]
 		game_state.ui.volume = widget_slider(
-			size = {x, y, 100, UI_LINE_HEIGHT},
+			size = {x, y, 150, UI_LINE_HEIGHT},
 			current = game_state.ui.volume,
 		)
-
-		when false {
-			widget_label({x, y, 50, UI_LINE_HEIGHT}, "Volume:")
-			widget_label({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(game_state.ui.volume)))
-
-			// añadir el width del elemento y padding para el siguiente
-			x += 100 + UI_PADDING
-
-			if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
-				game_state.ui.volume = min(game_state.ui.volume + 1, 10)
-			}
-			x += UI_LINE_HEIGHT + UI_PADDING
-
-			if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
-				game_state.ui.volume = max(game_state.ui.volume - 1, 0)
-			}
-			x += UI_LINE_HEIGHT + UI_PADDING
-		}
 	}
 }
 
@@ -188,222 +169,143 @@ render_create_figure_ui :: proc() {
 	using game_state.ui
 	widget_panel(panel_create_figure, "Create figure")
 
+	LABEL_PROPORTION  :: 0.6
+	INF_BUTTON_FACTOR :: 1.5
+	INF_BUTTON_WIDTH  :: (UI_LINE_HEIGHT - UI_PADDING/2) * INF_BUTTON_FACTOR + UI_PADDING
+
 	// Posición inicial
-	x : f32 = panel_create_figure.x + UI_PADDING + PANEL_BORDER_SIZE
-	y : f32 = panel_create_figure.y + /* saltar cabecera */ UI_LINE_HEIGHT
+	x := panel_create_figure.x + UI_PADDING + PANEL_BORDER_SIZE
+	y := panel_create_figure.y + /* saltar cabecera */ UI_LINE_HEIGHT
 
 	// Número de lados de la figura
-	// TODO: convertir otros elementos de la UI a esto
 	widget_number(
-		text = "Sides:",
+		text = "Sides",
 		number = &creation_n_sides,
 		minimum = 2,
 		maximum = FIGURE_MAX_SIDES,
-		size = {x, y, panel_create_figure.width-PANEL_BORDER_SIZE, UI_LINE_HEIGHT},
-		label = 0.7,
+		size = {x, y, panel_create_figure.width - PANEL_BORDER_SIZE - INF_BUTTON_WIDTH, UI_LINE_HEIGHT},
+		label = LABEL_PROPORTION,
 	)
 
-	x = UI_PADDING + UI_MARGIN + PANEL_BORDER_SIZE
 	y += UI_LINE_HEIGHT
 
 	// Contador de la figura
 	widget_number_inf(
-		text = "Counter:",
+		text = "Counter",
 		number = &creation_counter,
 		minimum = 1,
 		maximum = 100,
 		size = {x, y, panel_create_figure.width-PANEL_BORDER_SIZE, UI_LINE_HEIGHT},
-		label = 0.7,
+		label = LABEL_PROPORTION,
 	)
 
-	when false {
-		widget_label({x,      y, 50, UI_LINE_HEIGHT}, "Sides:")
-		widget_label({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(creation_n_sides)))
-		x += 100 + UI_PADDING
+	y += UI_LINE_HEIGHT
 
-		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
-			creation_n_sides = min(creation_n_sides + 1, FIGURE_MAX_SIDES)
-		}
-		x += UI_LINE_HEIGHT + UI_PADDING
-
-		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
-			creation_n_sides = max(creation_n_sides - 1, 2)
-		}
-		x += UI_LINE_HEIGHT + UI_PADDING
-	}
-	when false {
-		widget_label({x,      y, 50, UI_LINE_HEIGHT}, "Counter:")
-		widget_label({x + 50, y, 45, UI_LINE_HEIGHT}, cstr_from_int(creation_counter))
-
-		// añadir el width del elemento y padding para el siguiente
-		x += 100 + UI_PADDING
-
-		if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
-			creation_counter = min(creation_counter + 1, 100)
-		}
-		x += UI_LINE_HEIGHT + UI_PADDING
-
-		if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") && creation_counter != COUNTER_INF {
-			creation_counter = max(creation_counter - 1, 0)
-		}
-		x += UI_LINE_HEIGHT + UI_PADDING
-
-		if widget_button({x, y+UI_PADDING/2, 40, UI_BUTTON_SIZE}, "inf") {
-			creation_counter = COUNTER_INF
-		}
-	}
+	// Instrumento
+	widget_enum(
+		text = "Instrument",
+		value = &creation_instrument,
+		enum_str = INSTRUMENTS,
+		size = {x, y, panel_create_figure.width - PANEL_BORDER_SIZE - INF_BUTTON_WIDTH, UI_LINE_HEIGHT},
+		label = LABEL_PROPORTION,
+	)
 }
 
 render_figure_ui :: proc() {
-	if game_state.state == .View {
-		return
-	}
-
 	widget_panel(game_state.ui.panel_figure, "Figure Options")
 
-	x := game_state.ui.panel_figure.x + 6*UI_PADDING
-	y := game_state.ui.panel_figure.y + UI_LINE_HEIGHT
+	LABEL_PROPORTION  :: 0.6
+	INF_BUTTON_FACTOR :: 1.5
+	INF_BUTTON_WIDTH  :: (UI_LINE_HEIGHT - UI_PADDING/2) * INF_BUTTON_FACTOR + UI_PADDING
+
+	x := game_state.ui.panel_figure.x + UI_PADDING + PANEL_BORDER_SIZE
+	y := game_state.ui.panel_figure.y + /* saltar cabecera */ UI_LINE_HEIGHT
 
 	// Número de lados de la figura
-	{
-		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Sides:")
+	widget_number(
+		text = "Sides",
+		number = &game_state.current_figure.n,
+		minimum = 2,
+		maximum = FIGURE_MAX_SIDES,
+		size = {x, y, game_state.ui.panel_figure.width - PANEL_BORDER_SIZE - INF_BUTTON_WIDTH, UI_LINE_HEIGHT},
+		label = LABEL_PROPORTION,
+	)
 
-		x += 100 + UI_PADDING
-
-		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "+") {
-			game_state.current_figure.n = min(game_state.current_figure.n + 1, FIGURE_MAX_SIDES)
-		}
-
-		x += UI_LINE_HEIGHT + 5*UI_PADDING
-		widget_label({x, y, 45, UI_LINE_HEIGHT}, cstr_from_int(int(game_state.current_figure.n)))
-		x += UI_LINE_HEIGHT + UI_PADDING
-		if widget_button({x, y+UI_PADDING/2, UI_LINE_HEIGHT-UI_PADDING, UI_LINE_HEIGHT-UI_PADDING}, "-") {
-			game_state.current_figure.n = max(game_state.current_figure.n - 1, 2)
-		}
-		x += UI_LINE_HEIGHT + 6*UI_PADDING
-	}
-
-	x = game_state.ui.panel_figure.x + 6*UI_PADDING
 	y += UI_LINE_HEIGHT
 
 	// Contador inicial de la figura
-	{
-		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Counter:")
-		x += 100 + UI_PADDING
+	widget_number_inf(
+		text = "Counter",
+		number = &game_state.current_figure.point_counter_start,
+		minimum = 1,
+		maximum = 100,
+		size = {x, y, game_state.ui.panel_figure.width - PANEL_BORDER_SIZE, UI_LINE_HEIGHT},
+		label = LABEL_PROPORTION,
+		inf_size = 1.5,
+	)
 
-		if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
-			game_state.current_figure.point_counter_start = min(game_state.current_figure.point_counter_start + 1, 100)
-		}
-		
-		x += UI_LINE_HEIGHT + 5*UI_PADDING
-		widget_label({x, y, 45, UI_LINE_HEIGHT}, cstr_from_int(game_state.current_figure.point_counter_start))
-		x += UI_LINE_HEIGHT + UI_PADDING
+	y += UI_LINE_HEIGHT
 
-		if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") &&
-				game_state.current_figure.point_counter_start != COUNTER_INF {
-			game_state.current_figure.point_counter_start = max(game_state.current_figure.point_counter_start - 1, 0)
-		}
-		x += UI_LINE_HEIGHT + UI_PADDING
+	// Instrumento
+	widget_enum(
+		text = "Instrument",
+		value = &game_state.current_figure.instrument,
+		enum_str = INSTRUMENTS,
+		size = {x, y, game_state.ui.panel_figure.width - PANEL_BORDER_SIZE - INF_BUTTON_WIDTH, UI_LINE_HEIGHT},
+		label = LABEL_PROPORTION,
+	)
 
-		if widget_button({x, y+UI_PADDING/2, 40, UI_BUTTON_SIZE}, "inf") {
-			game_state.current_figure.point_counter_start = COUNTER_INF
-		}
-	}
-
-	x = game_state.ui.panel_figure.x + 6*UI_PADDING
 	y += UI_LINE_HEIGHT
 
 	// Especificar las notas
 	{
-		widget_label({x, y, 100, UI_LINE_HEIGHT}, "Sound Config:")
+		widget_label(
+			position = {x, y, game_state.ui.panel_figure.width - PANEL_BORDER_SIZE, UI_LINE_HEIGHT},
+			text = "--- Music Notes ---",
+			hcenter = true,
+		)
 		y += UI_LINE_HEIGHT
 
 		for vertex_index in 0..<game_state.current_figure.n {
-			widget_label(
-				{x, y, 50, UI_LINE_HEIGHT},
-				fmt.caprintf("Vertex %d", vertex_index + 1, allocator = context.temp_allocator),
-			)
-			x += 100 + UI_PADDING
-
-			if(INSTRUMENTS[game_state.current_figure.instrument] != "Drum"){
-				if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
-					note_value := int(game_state.current_figure.notes[vertex_index])
-					if note_value < len(STRING_NOTES) - 1 {
-						game_state.current_figure.notes[vertex_index] = Music_Notes(note_value+1)
-					}
-				}
-				x += UI_LINE_HEIGHT + 6*UI_PADDING
-
-			widget_label({x, y, 50, UI_LINE_HEIGHT}, STRING_NOTES[game_state.current_figure.notes[vertex_index]])
-
-				x += UI_LINE_HEIGHT + 6*UI_PADDING
-
-				if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") {
-					note_value := int(game_state.current_figure.notes[vertex_index])
-					if note_value > 0 {
-						game_state.current_figure.notes[vertex_index] = Music_Notes(note_value-1)
-					}
-				}
-			}else{
-				if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
-					p_value := int(game_state.current_figure.percussions[vertex_index])
-					if p_value < len(PERCUSSIONS) - 1 {
-						game_state.current_figure.percussions[vertex_index] = Percussion(p_value+1)
-					}
-				}
-				x += UI_LINE_HEIGHT
-
-				widget_label({x, y, 120, UI_LINE_HEIGHT}, PERCUSSIONS[game_state.current_figure.percussions[vertex_index]])
-
-				x += UI_LINE_HEIGHT + 12*UI_PADDING
-
-				if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") {
-					p_value := int(game_state.current_figure.percussions[vertex_index])
-					if p_value > 0 {
-						game_state.current_figure.percussions[vertex_index] = Percussion(p_value-1)
-					}
-				}
+			if game_state.current_figure.instrument != .Tambor {
+				widget_enum(
+					text = fmt.caprintf("Vertex %d", vertex_index + 1, allocator = context.temp_allocator),
+					value = &game_state.current_figure.notes[vertex_index],
+					enum_str = STRING_NOTES,
+					size = {x, y, game_state.ui.panel_figure.width-PANEL_BORDER_SIZE, UI_LINE_HEIGHT},
+					label = 0.4,
+				)
+			} else {
+				widget_enum(
+					text = fmt.caprintf("Vertex %d", vertex_index + 1, allocator = context.temp_allocator),
+					value = &game_state.current_figure.percussions[vertex_index],
+					enum_str = PERCUSSIONS,
+					size = {x, y, game_state.ui.panel_figure.width-PANEL_BORDER_SIZE, UI_LINE_HEIGHT},
+					label = 0.4,
+				)
 			}
-			x = game_state.ui.panel_figure.x + 6*UI_PADDING
 			y += UI_LINE_HEIGHT
 		}
 	}
-	
-	x = game_state.ui.panel_figure.x + 6*UI_PADDING
-	//No hay necesidad de un aumento de y aquí, ya que se añadió en el for superior
 
-	//Instrumento
-	{
-		widget_label({x, y, 60, UI_LINE_HEIGHT}, "Instrument: ")
-		x += 100 + UI_PADDING
+	// No hay necesidad de un aumento de y aquí, ya que se añadió en el for
+	// superior
 
-		if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "+") {
-			instrument := int(game_state.current_figure.instrument)
-			if instrument < len(INSTRUMENTS) - 1 {
-				game_state.current_figure.instrument = Instrument(instrument+1)
-			}
-		}
-		x += UI_LINE_HEIGHT + UI_PADDING
-
-		widget_label({x, y, 65, UI_LINE_HEIGHT}, INSTRUMENTS[game_state.current_figure.instrument])
-
-		x += UI_LINE_HEIGHT+15
-
-		if widget_button({x, y+UI_PADDING/2, UI_BUTTON_SIZE, UI_BUTTON_SIZE}, "-") {
-			instrument := int(game_state.current_figure.instrument)
-			if instrument > 0 {
-				game_state.current_figure.instrument = Instrument(instrument-1)
-			}
-		}
-		x = game_state.ui.panel_figure.x + UI_PADDING
-		y += UI_LINE_HEIGHT
-	}
-
-		x = game_state.ui.panel_figure.x + 6*UI_PADDING
-
-	
 	// BPM config
-	{
+	// TODO: usar slider o input de teclado?
+	when true {
+		bpm := game_state.current_figure.frecuency * 60
+		if widget_slider_number(
+			size = {x, y, game_state.ui.panel_create_figure.width - PANEL_BORDER_SIZE - 3*UI_PADDING, UI_LINE_HEIGHT},
+			current = &bpm,
+			minimum = FIGURE_MIN_FRECUENCY * 60,
+			maximum = FIGURE_MAX_FRECUENCY * 60,
+			fmt_str = "  %3.1f BPM",
+		) {
+			game_state.current_figure.frecuency = bpm / 60
+			update_figure_radius(game_state.current_figure)
+		}
+	} else {
 		if !game_state.ui.bpm_text_box.selected && uint(f32(game_state.current_figure.frecuency * 60)) != game_state.ui.bpm_text_box.value {
 			game_state.ui.bpm_text_box.value = uint(f32(game_state.current_figure.frecuency * 60))
 		}
@@ -446,39 +348,31 @@ render_figure_ui :: proc() {
 		game_state.current_figure.frecuency = f32(game_state.ui.bpm_text_box.value) / 60
 		update_figure_radius(game_state.current_figure)
 
-		widget_label({x, y, 50, UI_LINE_HEIGHT}, "Bpm:")
+		widget_label({x, y, 50, UI_LINE_HEIGHT}, "BPM")
 		x += 100 + UI_PADDING
 		game_state.ui.bpm_text_box.box = rl.Rectangle({x, y+7, 50, UI_LINE_HEIGHT - 15 })
 		rl.DrawRectangleRec(game_state.ui.bpm_text_box.box, rl.DARKGRAY)
 		x += UI_PADDING
 
 		rl.DrawText(
-		fmt.caprintf("%d", game_state.ui.bpm_text_box.value, allocator = context.temp_allocator),
-		i32(x), i32(y+9),
-		UI_FONT_SIZE,
-		rl.WHITE,
+			fmt.caprintf("%d", game_state.ui.bpm_text_box.value, allocator = context.temp_allocator),
+			i32(x), i32(y+9),
+			UI_FONT_SIZE,
+			rl.WHITE,
 		)
-
 	}
 
-	x = game_state.ui.panel_figure.x + 6*UI_PADDING
+	x = game_state.ui.panel_figure.x + UI_PADDING + PANEL_BORDER_SIZE
 	y += UI_LINE_HEIGHT
 
 	// Borrar figura
 	// WARN: debe estar al final de la función: si se borra la figura y el
 	// código siguiente usa game_state.current_figure, habrá un crash
-	{
-		widget_label({x, y, 80, UI_LINE_HEIGHT}, "Delete")
-		x += 100 + UI_PADDING
-
-		if widget_button({x, y+UI_PADDING/2, 60, UI_BUTTON_SIZE}, "X") {
-			delete_current_figure()
-		}
+	if widget_button({x + game_state.ui.panel_figure.width / 2 - 75 / 2, y+UI_PADDING/2, 75, UI_BUTTON_SIZE}, "Delete") {
+		delete_current_figure()
 	}
 
-	x = game_state.ui.panel_figure.x + UI_PADDING
 	y += UI_LINE_HEIGHT + UI_PADDING
-
 	game_state.ui.panel_figure.height = y - game_state.ui.panel_figure.y
 }
 

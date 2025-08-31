@@ -109,6 +109,7 @@ update_figure_selection_tool :: proc() {
 
 					// Características heredadas de la UI de creación
 					n                   = ui.creation_n_sides,
+					instrument          = ui.creation_instrument,
 					point_counter_start = ui.creation_counter,
 					point_counter       = ui.creation_counter,
 
@@ -570,15 +571,15 @@ render_regular_figure_common :: proc(
 			in1 := screen_center - screen_selector
 			in2 := screen_center + screen_selector
 
-			rl.DrawLineEx(out1, in1, line_size, color)
-			rl.DrawLineEx(out2, in2, line_size, color)
+			rl.DrawLineEx(out1, in1, line_size/2, color)
+			rl.DrawLineEx(out2, in2, line_size/2, color)
 		}
 	} else if fig.n == 2 {
 		// Si no hay círculo de selección y es una línea, dibujarla completa
 		screen_diff := to_screen(camera, diff)
 		point1 := screen_center - screen_diff // = to_screen(camera, fig.radius)
 		point2 := screen_center + screen_diff
-		rl.DrawLineEx(point1, point2, line_size, color)
+		rl.DrawLineEx(point1, point2, line_size/2, color)
 	}
 
 	// Si la figura no es una línea, dibujar normal, tenga o no círculo de
