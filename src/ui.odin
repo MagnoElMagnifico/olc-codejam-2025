@@ -5,6 +5,7 @@ import rl "vendor:raylib"
 import "core:fmt"
 import "core:strconv"
 import "core:strings"
+import "core:log"
 
 UI_FONT_SIZE   :: 12
 UI_LINE_HEIGHT :: 30
@@ -129,21 +130,16 @@ render_toolbox_ui :: proc() {
 
 	// Reset contadores
 	{
-		if widget_button({x, y+UI_PADDING/2, 120, UI_BUTTON_SIZE}, "Reset counts") {
+		if widget_button({x, y+UI_PADDING/2, 120, UI_BUTTON_SIZE}, "Reset figure") {
 			if game_state.current_figure != nil {
 				using game_state.current_figure
 				point_counter = point_counter_start
-
+				is_active = true
 			}else if game_state.state == .Multiselection {
-				if len(game_state.selected_figures) == 1{
-					game_state.selected_figures[0].point_counter = game_state.selected_figures[0].point_counter_start
-					game_state.selected_figures[0].is_active = true
-				}else{
-					for &f in game_state.selected_figures {
-					f.point_counter = f.point_counter_start
-						if f.previous_figure == nil {
-							f.is_active = true
-						}
+				for &f in game_state.selected_figures {
+				f.point_counter = f.point_counter_start
+					if f.previous_figure == nil {
+						f.is_active = true
 					}
 				}
 			} else {

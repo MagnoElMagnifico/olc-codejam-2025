@@ -9,6 +9,7 @@ import "core:c"
 import "core:mem"
 import "core:slice/heap"
 import "core:math"
+import "core:log"
 // ==== CONSTANTS =============================================================
 
 POINT_SPEED          :: 200   // px/s
@@ -18,7 +19,8 @@ COUNTER_INF          :: -1
 
 FIGURE_MAX_SIDES     :: 16
 FIGURE_POINT_RADIUS  :: 5.0
-FIGURE_MIN_RADIUS    :: 30
+FIGURE_MIN_RADIUS_SELECTOR :: 30
+FIGURE_MIN_RADIUS :: 10.5
 FIGURE_SELECTOR_SIZE :: 15
 
 FIGURE_VIEW_COLOR         :: rl.WHITE
@@ -398,7 +400,9 @@ update_figure_link_tool :: proc() {
 
 	// Desactivar la figura que recibe el link
 	selected.is_active = false
-
+	
+	selected.point_counter = selected.point_counter_start
+	selected.point_progress = 0
 	// Ahorar mirar si hacia atrás hay una figura activa
 	f := current_figure
 	for !f.is_active && f.previous_figure != nil {
@@ -412,13 +416,6 @@ update_figure_link_tool :: proc() {
 			break
 		}
 	}
-
-	// Si no había un bucle, resetear la figura apuntada, para que empiece de 0
-	if !selected.is_active {
-		selected.point_counter = selected.point_counter_start
-		selected.point_progress = 0
-	}
-
 	// Y cancelar la selección
 	current_figure = nil
 }
@@ -482,29 +479,25 @@ update_figure_state :: proc(fig: ^Regular_Figure) {
 				// Decrementar contador si todavía tiene
 				fig.point_counter -= 1
 
-			} else if fig.point_counter == 1 {
+			} else if fig.point_counter == 1 || fig.point_counter == 0 {
 				// Poner el contador a 0
 				fig.point_counter = 0
 
 				// Sino, pasar a inactivo y resetear el contador
 				fig.is_active = false
-				fig.point_counter = fig.point_counter_start
 
 				// Dar el paso a la siguiente figura, si hay
+				if fig.next_figure != nil {
+					fig.next_figure.is_active = true
+				}
+
+				// Buscar ciclos y determinar si reiniciar el contador
 				next := fig.next_figure
 				for next != nil {
-					// Si la siguiente tiene contador disponible, ejecutar esa
-					// Sino, seguir buscando
-					if next.point_counter != 0 {
-						next.is_active = true
-						break
-					}
-
-					// Ciclo encontrado, no entrar en bucle infinito
 					if next == fig {
+						fig.point_counter = fig.point_counter_start
 						break
 					}
-
 					next = next.next_figure
 				}
 			}
@@ -541,7 +534,7 @@ render_regular_figure_common :: proc(
 	}
 
 	// Dibujar círculo de selección + indicador del contador
-	if screen_radius > FIGURE_MIN_RADIUS {
+	if screen_radius > FIGURE_MIN_RADIUS_SELECTOR {
 		// Dibujar el "handle" que permite seleccionar y mover la figura
 		c_screen_center := iv2 {c.int(screen_center.x), c.int(screen_center.y)}
 		rl.DrawCircleLines(c_screen_center.x, c_screen_center.y, FIGURE_SELECTOR_SIZE, color)
@@ -564,14 +557,16 @@ render_regular_figure_common :: proc(
 		// Dibujar línea teniendo en cuenta el círculo de selección para que no
 		// se crucen las líneas
 		if fig.n == 2 {
-			screen_diff := to_screen(camera, diff)
+			// Los puntos alejados del centro
+			screen_radius_v := to_screen(camera, fig.radius)
+			screen_diff := screen_center - screen_radius_v
+
+			// Los puntos alejados del centro
+			out1 := screen_radius_v
+			out2 := screen_center + screen_diff
 
 			// Vector que apunta al círculo de selección
 			screen_selector := m.normalize0(screen_diff) * FIGURE_SELECTOR_SIZE
-
-			// Los puntos alejados del centro
-			out1 := screen_center - screen_diff // = to_screen(camera, fig.radius)
-			out2 := screen_center + screen_diff
 
 			// Los puntos que están en la circunferencia de la selección
 			in1 := screen_center - screen_selector
@@ -582,10 +577,10 @@ render_regular_figure_common :: proc(
 		}
 	} else if fig.n == 2 {
 		// Si no hay círculo de selección y es una línea, dibujarla completa
-		screen_diff := to_screen(camera, diff)
-		point1 := screen_center - screen_diff // = to_screen(camera, fig.radius)
-		point2 := screen_center + screen_diff
-		rl.DrawLineEx(point1, point2, line_size/2, color)
+		screen_radius_v := to_screen(camera, fig.radius)
+		screen_diff := screen_center - screen_radius_v
+		point := screen_center + screen_diff
+		rl.DrawLineEx(screen_radius_v, point, line_size/2, color)
 	}
 
 	// Si la figura no es una línea, dibujar normal, tenga o no círculo de
@@ -931,10 +926,10 @@ select_figure :: proc() -> (selected: ^Regular_Figure) {
 @(private="file")
 is_figure_big_enough :: #force_inline proc "contextless" (fig: Regular_Figure) -> bool {
 	diff := fig.center - fig.radius
-	if (m.vector_length(diff) * game_state.camera.zoom > FIGURE_MIN_RADIUS) {
+	if (m.vector_length(diff) * game_state.camera.zoom > FIGURE_MIN_RADIUS_SELECTOR) {
 		return true
 	} else {
-		if (fig.frecuency <= 11 && m.vector_length(diff) > 10.5){
+		if (fig.frecuency <= FIGURE_MAX_FRECUENCY && m.vector_length(diff) > FIGURE_MIN_RADIUS){
 			return true
 		}else{
 			return false
