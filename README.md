@@ -6,6 +6,14 @@ explains in [this video]), using [Raylib].
 
 The theme for this Jam was **shapes**.
 
+You can play the game on [itch.io].
+
+# Screenshots
+
+![](img/cover.png)
+![](img/image.png)
+![](img/image2.png)
+
 # Building
 
 Run the specific files for your platform:
@@ -50,7 +58,7 @@ can:
 -   You can resize the figure by moving the small circle on one of the figure's
     vertices. This makes the beat faster or slower.
 -   You can synchronize the beat with the rest of the sounds by clicking on the
-    figure's sides. To reset the current cicle, use the button `Synch beats`.
+    figure's sides. To reset the current cicle, use the button `Reset beats`.
 -   Each figure will have a counter. When the beats completes one cicle, the
     counter gets decreased by one. When the counter is 0, no more sounds will be
     played.
@@ -69,9 +77,19 @@ counter reaches 0, the linked figure will start playing.
     previous.
 -   Double click a figure to remove its link (essentially, a link to itself).
 
-
 Anytime, you can use `Space` to pause the simulation and the mouse wheel to move
 the camera around.
+
+# Code stats
+
+    ---------------------------------------------------------------------
+    Language           files          blank        comment           code
+    ---------------------------------------------------------------------
+    Odin                  10            476            485           1931
+    HTML                   1             13              1            100
+    ---------------------------------------------------------------------
+    SUM:                  11            489            486           2031
+    ---------------------------------------------------------------------
 
 # Useful links
 
@@ -87,3 +105,4 @@ the camera around.
 [Web Odin Template]: https://github.com/karl-zylinski/odin-raylib-web
 [this video]: https://youtu.be/WhRIjmHS-Og
 [Raylib]: https://www.raylib.com/
+[itch.io]: https://magnoelmagnifico.itch.io/synth-shapes
